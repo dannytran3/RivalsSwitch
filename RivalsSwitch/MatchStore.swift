@@ -3,7 +3,8 @@ import Foundation
 class MatchStore {
     static let shared = MatchStore()
     private init() {}
-
+    
+    var currentUsername: String = ""
     var currentHero: String = ""
     var currentKills: Int = 0
     var currentDeaths: Int = 0
@@ -28,6 +29,7 @@ class MatchStore {
     private let matchesKey = "savedMatches"
 
     func clearCurrentMatch() {
+        currentUsername = ""
         currentHero = ""
         currentKills = 0
         currentDeaths = 0

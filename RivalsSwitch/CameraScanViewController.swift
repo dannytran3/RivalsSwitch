@@ -10,6 +10,23 @@ import Vision
 
 class CameraScanViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
+    // MARK: - OCR Models
+    
+    private struct OCRItem {
+        let text: String
+        let rect: CGRect
+        let midY: CGFloat
+        let minX: CGFloat
+        let yellowScore: CGFloat
+    }
+    
+    private struct OCRRow {
+        let texts: [String]
+        let frame: CGRect
+        let midY: CGFloat
+        let yellowScore: CGFloat
+    }
+    
     // UI Elements
     private let photoImageView = UIImageView()
     private let detectedHeroesLabel = UILabel()
@@ -18,6 +35,12 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     private let retakePhotoButton = UIButton(type: .system)
     private let imagePicker = UIImagePickerController()
     private var gradientLayer: CAGradientLayer?
+    
+    // Known heroes we want to detect from OCR text
+    private let knownHeroes = [
+        "spider-man", "iron man", "hulk", "loki",
+        "punisher", "magneto", "storm", "thor"
+    ]
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -194,6 +217,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             return
         }
 
+        // Create a Vision text recognition request
         let request = VNRecognizeTextRequest { [weak self] request, error in
             guard let self = self else { return }
 
@@ -205,15 +229,16 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
 
             let observations = request.results as? [VNRecognizedTextObservation] ?? []
-            let recognizedStrings = observations.compactMap { $0.topCandidates(1).first?.string }
 
             DispatchQueue.main.async {
-                self.handleRecognizedText(recognizedStrings)
+                self.handleRecognizedText(observations, in: image)
             }
         }
 
+        // Use accurate recognition for scoreboard text
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
+        request.recognitionLanguages = ["en-US"]
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
 
@@ -227,64 +252,375 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
         }
     }
-
-    private func handleRecognizedText(_ lines: [String]) {
-        let fullText = lines.joined(separator: "\n")
+    
+    private func handleRecognizedText(_ observations: [VNRecognizedTextObservation], in image: UIImage) {
         detectedHeroesLabel.text = "Scan Complete"
-
-        parseOCRText(fullText)
-
-        // Navigate to Confirm My Stats
+        
+        print("OBSERVATION COUNT:", observations.count)
+        
+        let rows = buildRows(from: observations, in: image)
+        
+        print("OCR ROWS:")
+        for row in rows {
+            print(row.texts, "yellow:", row.yellowScore, "frame:", row.frame)
+        }
+        
+        MatchStore.shared.clearCurrentMatch()
+        
+        // Parse the selected player row first, then hero separately
+        if let selectedRow = findSelectedPlayerRow(from: rows) {
+            print("SELECTED ROW:", selectedRow.texts)
+            parseSelectedPlayerData(from: selectedRow, using: observations)
+        } else {
+            print("NO SELECTED ROW FOUND")
+        }
+        
+        parseHero(from: observations)
+        
+        print("SAVED HERO:", MatchStore.shared.currentHero)
+        print("SAVED USERNAME:", MatchStore.shared.currentUsername)
+        print("SAVED KDA:", MatchStore.shared.currentKills, MatchStore.shared.currentDeaths, MatchStore.shared.currentAssists)
+        
         let confirmStatsVC = ConfirmMyStatsViewController()
         navigationController?.pushViewController(confirmStatsVC, animated: true)
     }
 
-    private func parseOCRText(_ text: String) {
-        // Reset old data
-        MatchStore.shared.clearCurrentMatch()
+    private func buildRows(from observations: [VNRecognizedTextObservation], in image: UIImage) -> [OCRRow] {
+        let items: [OCRItem] = observations.compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rect = observation.boundingBox
+            
+            // Ignore empty OCR text
+            guard !text.isEmpty else { return nil }
+            
+            // Ignore the top header and bottom hero stat strip
+            if rect.midY > 0.86 || rect.midY < 0.28 {
+                return nil
+            }
 
-        let lower = text.lowercased()
+            // Only use the left scoreboard when building player rows
+            if rect.minX > 0.56 {
+                return nil
+            }
+            
+            return OCRItem(
+                text: text,
+                rect: rect,
+                midY: rect.midY,
+                minX: rect.minX,
+                yellowScore: yellowScore(in: image, for: rect)
+            )
+        }
+        
+        let sorted = items.sorted {
+            if abs($0.midY - $1.midY) > 0.03 {
+                return $0.midY > $1.midY
+            }
+            return $0.minX < $1.minX
+        }
+        
+        var groupedRows: [[OCRItem]] = []
+        
+        for item in sorted {
+            if let lastIndex = groupedRows.indices.last {
+                let lastRowY = groupedRows[lastIndex].map(\.midY).reduce(0, +) / CGFloat(groupedRows[lastIndex].count)
+                
+                // If the Y value is close enough, treat it as the same row
+                if abs(lastRowY - item.midY) < 0.03 {
+                    groupedRows[lastIndex].append(item)
+                } else {
+                    groupedRows.append([item])
+                }
+            } else {
+                groupedRows.append([item])
+            }
+        }
+        
+        return groupedRows.map { row in
+            let ordered = row.sorted { $0.minX < $1.minX }
+            let texts = ordered.map(\.text)
+            let avgY = ordered.map(\.midY).reduce(0, +) / CGFloat(ordered.count)
+            let avgYellow = ordered.map(\.yellowScore).reduce(0, +) / CGFloat(ordered.count)
+            let frame = ordered.reduce(CGRect.null) { partial, item in
+                partial.union(item.rect)
+            }
+            
+            return OCRRow(
+                texts: texts,
+                frame: frame,
+                midY: avgY,
+                yellowScore: avgYellow
+            )
+        }
+    }
+    
+    private func findSelectedPlayerRow(from rows: [OCRRow]) -> OCRRow? {
+        let savedUsername = UserDefaults.standard
+            .string(forKey: "username")?
+            .lowercased()
+            .trimmingCharacters(in: CharacterSet.whitespacesAndNewlines)
 
-        // Try to detect hero names from OCR text
-        let knownHeroes = [
-            "spider-man", "iron man", "hulk", "loki",
-            "punisher", "magneto", "storm"
-        ]
+        if let savedUsername, !savedUsername.isEmpty {
+            let bestUsernameMatch = rows.compactMap { row -> (OCRRow, Int)? in
+                guard let candidate = bestUsername(from: row.texts)?.lowercased() else { return nil }
+                let distance = levenshteinDistance(savedUsername, candidate)
+                return (row, distance)
+            }
+            .min { $0.1 < $1.1 }
 
-        var foundHeroes: [String] = []
-
-        for hero in knownHeroes {
-            if lower.contains(hero) {
-                foundHeroes.append(hero.capitalized)
+            if let bestMatch = bestUsernameMatch, bestMatch.1 <= 4 {
+                print("SELECTED ROW BY CLOSEST USERNAME:", bestMatch.0.texts, "distance:", bestMatch.1)
+                return bestMatch.0
             }
         }
 
-        // Very simple assumption:
-        // first hero found = player's hero
-        // next up to 6 heroes = enemy team
-        if let first = foundHeroes.first {
-            MatchStore.shared.currentHero = first
+        let candidateRows = rows.filter { row in
+            let rowText = row.texts.joined(separator: " ").lowercased()
+            let smallNumbers = extractSmallIntegers(from: rowText)
+
+            guard containsUsernameLikeToken(in: row.texts) else { return false }
+            guard smallNumbers.count >= 3 else { return false }
+            guard row.texts.count >= 3 else { return false }
+
+            return true
         }
 
-        let enemies = Array(foundHeroes.dropFirst().prefix(6))
-        if enemies.indices.contains(0) { MatchStore.shared.enemy1 = enemies[0] }
-        if enemies.indices.contains(1) { MatchStore.shared.enemy2 = enemies[1] }
-        if enemies.indices.contains(2) { MatchStore.shared.enemy3 = enemies[2] }
-        if enemies.indices.contains(3) { MatchStore.shared.enemy4 = enemies[3] }
-        if enemies.indices.contains(4) { MatchStore.shared.enemy5 = enemies[4] }
-        if enemies.indices.contains(5) { MatchStore.shared.enemy6 = enemies[5] }
+        print("CANDIDATE ROWS:")
+        for row in candidateRows {
+            print(row.texts, "yellow:", row.yellowScore)
+        }
 
-        // Very simple stat extraction:
-        // look for all integers in the text and use first few as K/D/A
+        return candidateRows.max { $0.yellowScore < $1.yellowScore }
+    }
+    
+    private func parseSelectedPlayerData(from selectedRow: OCRRow, using observations: [VNRecognizedTextObservation]) {
+        // Save the full row text for debugging
+        print("SELECTED ROW FRAME:", selectedRow.frame)
+        print("SELECTED ROW YELLOW:", selectedRow.yellowScore)
+        
+        // Build regions relative to the selected row
+        let usernameBox = CGRect(
+            x: selectedRow.frame.minX + selectedRow.frame.width * 0.22,
+            y: selectedRow.frame.minY - selectedRow.frame.height * 0.15,
+            width: selectedRow.frame.width * 0.40,
+            height: selectedRow.frame.height * 1.30
+        )
+        
+        let killsBox = CGRect(
+            x: selectedRow.frame.minX + selectedRow.frame.width * 0.70,
+            y: selectedRow.frame.minY - selectedRow.frame.height * 0.15,
+            width: selectedRow.frame.width * 0.08,
+            height: selectedRow.frame.height * 1.30
+        )
+        
+        let deathsBox = CGRect(
+            x: selectedRow.frame.minX + selectedRow.frame.width * 0.80,
+            y: selectedRow.frame.minY - selectedRow.frame.height * 0.15,
+            width: selectedRow.frame.width * 0.08,
+            height: selectedRow.frame.height * 1.30
+        )
+        
+        let assistsBox = CGRect(
+            x: selectedRow.frame.minX + selectedRow.frame.width * 0.90,
+            y: selectedRow.frame.minY - selectedRow.frame.height * 0.15,
+            width: selectedRow.frame.width * 0.08,
+            height: selectedRow.frame.height * 1.30
+        )
+        
+        let usernameTexts = texts(in: usernameBox, from: observations)
+        let killTexts = texts(in: killsBox, from: observations)
+        let deathTexts = texts(in: deathsBox, from: observations)
+        let assistTexts = texts(in: assistsBox, from: observations)
+        
+        print("USERNAME BOX:", usernameTexts)
+        print("KILLS BOX:", killTexts)
+        print("DEATHS BOX:", deathTexts)
+        print("ASSISTS BOX:", assistTexts)
+        
+        let username = bestUsername(from: usernameTexts)
+        let kills = firstInteger(in: killTexts.joined(separator: " "))
+        let deaths = firstInteger(in: deathTexts.joined(separator: " "))
+        let assists = firstInteger(in: assistTexts.joined(separator: " "))
+        
+        MatchStore.shared.currentUsername = username ?? ""
+        MatchStore.shared.currentKills = kills ?? 0
+        MatchStore.shared.currentDeaths = deaths ?? 0
+        MatchStore.shared.currentAssists = assists ?? 0
+    }
+    
+    private func parseHero(from observations: [VNRecognizedTextObservation]) {
+        var bestHero = ""
+        var bestDistance = Int.max
+
+        for observation in observations {
+            guard let candidate = observation.topCandidates(1).first else { continue }
+
+            let text = normalizedOCRText(candidate.string)
+
+            let rect = observation.boundingBox
+
+            // Hero label is usually in the lower-left panel
+            if rect.midY < 0.28 && rect.minX < 0.30 {
+                for hero in knownHeroes {
+                    let distance = levenshteinDistance(text, normalizedOCRText(hero))
+
+                    if distance < bestDistance {
+                        bestDistance = distance
+                        bestHero = hero.capitalized
+                    }
+                }
+            }
+        }
+
+        // Only accept close enough hero matches
+        if bestDistance <= 3 {
+            MatchStore.shared.currentHero = bestHero
+        } else {
+            MatchStore.shared.currentHero = ""
+        }
+    }
+    
+    private func texts(in region: CGRect, from observations: [VNRecognizedTextObservation]) -> [String] {
+        observations.compactMap { observation in
+            guard let candidate = observation.topCandidates(1).first else { return nil }
+            
+            let rect = observation.boundingBox
+            
+            guard region.intersects(rect) else { return nil }
+            
+            return candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+    }
+    
+    private func bestUsername(from texts: [String]) -> String? {
+        let cleaned = texts
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+            .filter { text in
+                let lower = text.lowercased()
+                return !knownHeroes.contains(lower)
+            }
+            .sorted { $0.count > $1.count }
+        
+        return cleaned.first
+    }
+    
+    private func firstInteger(in text: String) -> Int? {
         let numbers = text
             .components(separatedBy: CharacterSet.decimalDigits.inverted)
             .compactMap { Int($0) }
-
-        if numbers.indices.contains(0) { MatchStore.shared.currentKills = numbers[0] }
-        if numbers.indices.contains(1) { MatchStore.shared.currentDeaths = numbers[1] }
-        if numbers.indices.contains(2) { MatchStore.shared.currentAssists = numbers[2] }
+        
+        return numbers.first
+    }
+    
+    private func extractSmallIntegers(from text: String) -> [Int] {
+        text.components(separatedBy: CharacterSet.decimalDigits.inverted)
+            .compactMap { Int($0) }
+            .filter { $0 >= 0 && $0 <= 99 }
+    }
+    
+    private func containsUsernameLikeToken(in texts: [String]) -> Bool {
+        for token in texts {
+            let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
+            let lower = trimmed.lowercased()
+            
+            if trimmed.count < 3 { continue }
+            if knownHeroes.contains(lower) { continue }
+            if Int(trimmed) != nil { continue }
+            
+            let hasLetters = lower.rangeOfCharacter(from: .letters) != nil
+            if hasLetters {
+                return true
+            }
+        }
+        
+        return false
+    }
+    
+    private func yellowScore(in image: UIImage, for normalizedRect: CGRect) -> CGFloat {
+        guard let cgImage = image.cgImage else { return 0 }
+        
+        let imageWidth = CGFloat(cgImage.width)
+        let imageHeight = CGFloat(cgImage.height)
+        
+        let pixelRect = CGRect(
+            x: normalizedRect.minX * imageWidth,
+            y: (1.0 - normalizedRect.maxY) * imageHeight,
+            width: normalizedRect.width * imageWidth,
+            height: normalizedRect.height * imageHeight
+        ).integral
+        
+        guard pixelRect.width > 0, pixelRect.height > 0 else { return 0 }
+        guard let cropped = cgImage.cropping(to: pixelRect) else { return 0 }
+        
+        let colorSpace = CGColorSpaceCreateDeviceRGB()
+        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
+        var rawData = [UInt8](repeating: 0, count: 4)
+        
+        guard let context = CGContext(
+            data: &rawData,
+            width: 1,
+            height: 1,
+            bitsPerComponent: 8,
+            bytesPerRow: 4,
+            space: colorSpace,
+            bitmapInfo: bitmapInfo
+        ) else {
+            return 0
+        }
+        
+        context.draw(cropped, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        
+        let red = CGFloat(rawData[0]) / 255.0
+        let green = CGFloat(rawData[1]) / 255.0
+        let blue = CGFloat(rawData[2]) / 255.0
+        
+        // Yellow text should have high red and green, with lower blue
+        return (red + green) - blue
     }
 
+    private func levenshteinDistance(_ lhs: String, _ rhs: String) -> Int {
+        let a = Array(lhs)
+        let b = Array(rhs)
+
+        if a.isEmpty { return b.count }
+        if b.isEmpty { return a.count }
+
+        var dp = Array(repeating: Array(repeating: 0, count: b.count + 1), count: a.count + 1)
+
+        for i in 0...a.count {
+            dp[i][0] = i
+        }
+
+        for j in 0...b.count {
+            dp[0][j] = j
+        }
+
+        for i in 1...a.count {
+            for j in 1...b.count {
+                if a[i - 1] == b[j - 1] {
+                    dp[i][j] = dp[i - 1][j - 1]
+                } else {
+                    dp[i][j] = min(
+                        dp[i - 1][j] + 1,
+                        dp[i][j - 1] + 1,
+                        dp[i - 1][j - 1] + 1
+                    )
+                }
+            }
+        }
+
+        return dp[a.count][b.count]
+    }
+    
+    private func normalizedOCRText(_ text: String) -> String {
+        text.lowercased()
+            .components(separatedBy: CharacterSet.alphanumerics.inverted)
+            .joined()
+    }
+    
     private func showAlert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
