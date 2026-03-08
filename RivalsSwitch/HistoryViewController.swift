@@ -13,17 +13,25 @@ class HistoryViewController: UIViewController, UITableViewDataSource, UITableVie
     private let tableView = UITableView()
     private var matches: [String] = []
     private var gradientLayer: CAGradientLayer?
+    
+    // Empty State
+    private let emptyStateView = UIView()
+    private let emptyIconView = UIImageView()
+    private let emptyTitleLabel = UILabel()
+    private let emptyMessageLabel = UILabel()
 
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
         setupStyling()
+        setupEmptyState()
     }
     
     override func viewWillAppear(_ animated: Bool) {
         super.viewWillAppear(animated)
         matches = MatchStore.shared.loadMatches()
         tableView.reloadData()
+        updateEmptyState()
     }
     
     override func viewDidLayoutSubviews() {
@@ -72,6 +80,69 @@ class HistoryViewController: UIViewController, UITableViewDataSource, UITableVie
         tableView.backgroundColor = .clear
         tableView.separatorColor = .appDividerColor
         tableView.separatorInset = UIEdgeInsets(top: 0, left: 16, bottom: 0, right: 16)
+    }
+    
+    private func setupEmptyState() {
+        // Empty State Container
+        emptyStateView.translatesAutoresizingMaskIntoConstraints = false
+        emptyStateView.isHidden = true
+        view.addSubview(emptyStateView)
+        
+        // Icon
+        emptyIconView.translatesAutoresizingMaskIntoConstraints = false
+        emptyIconView.image = UIImage(systemName: "chart.line.uptrend.xyaxis.circle")
+        emptyIconView.tintColor = .appPrimaryAccent.withAlphaComponent(0.6)
+        emptyIconView.contentMode = .scaleAspectFit
+        emptyStateView.addSubview(emptyIconView)
+        
+        // Title
+        emptyTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        emptyTitleLabel.text = "No matches yet"
+        emptyTitleLabel.font = .appHeading3
+        emptyTitleLabel.textColor = .appPrimaryText
+        emptyTitleLabel.textAlignment = .center
+        emptyStateView.addSubview(emptyTitleLabel)
+        
+        // Message
+        emptyMessageLabel.translatesAutoresizingMaskIntoConstraints = false
+        emptyMessageLabel.text = "Your match history will appear here\nonce you scan some games! 🎮"
+        emptyMessageLabel.font = .appBodyLarge
+        emptyMessageLabel.textColor = .appSecondaryText
+        emptyMessageLabel.textAlignment = .center
+        emptyMessageLabel.numberOfLines = 0
+        emptyStateView.addSubview(emptyMessageLabel)
+        
+        // Constraints
+        NSLayoutConstraint.activate([
+            // Empty State View
+            emptyStateView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+            emptyStateView.centerYAnchor.constraint(equalTo: view.centerYAnchor, constant: -40),
+            emptyStateView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 40),
+            emptyStateView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -40),
+            
+            // Icon
+            emptyIconView.topAnchor.constraint(equalTo: emptyStateView.topAnchor),
+            emptyIconView.centerXAnchor.constraint(equalTo: emptyStateView.centerXAnchor),
+            emptyIconView.widthAnchor.constraint(equalToConstant: 80),
+            emptyIconView.heightAnchor.constraint(equalToConstant: 80),
+            
+            // Title
+            emptyTitleLabel.topAnchor.constraint(equalTo: emptyIconView.bottomAnchor, constant: 24),
+            emptyTitleLabel.leadingAnchor.constraint(equalTo: emptyStateView.leadingAnchor),
+            emptyTitleLabel.trailingAnchor.constraint(equalTo: emptyStateView.trailingAnchor),
+            
+            // Message
+            emptyMessageLabel.topAnchor.constraint(equalTo: emptyTitleLabel.bottomAnchor, constant: 12),
+            emptyMessageLabel.leadingAnchor.constraint(equalTo: emptyStateView.leadingAnchor),
+            emptyMessageLabel.trailingAnchor.constraint(equalTo: emptyStateView.trailingAnchor),
+            emptyMessageLabel.bottomAnchor.constraint(equalTo: emptyStateView.bottomAnchor)
+        ])
+    }
+    
+    private func updateEmptyState() {
+        let isEmpty = matches.isEmpty
+        emptyStateView.isHidden = !isEmpty
+        tableView.isHidden = isEmpty
     }
 
     func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
