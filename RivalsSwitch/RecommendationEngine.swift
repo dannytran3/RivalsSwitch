@@ -10,7 +10,7 @@ class RecommendationEngine {
         enemyTeam: [String]
     ) -> [(String, String)] {
 
-        let currentHero = hero.lowercased().trimmingCharacters(in: .whitespacesAndNewlines)
+        let _ = hero.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) // Reserved for future use
         let enemies = enemyTeam.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }
         var recommendations: [(String, String)] = []
 
