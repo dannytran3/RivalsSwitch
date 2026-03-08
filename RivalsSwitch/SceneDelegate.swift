@@ -17,14 +17,8 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         
         window = UIWindow(windowScene: windowScene)
         
-        // Check if user is logged in
-        if UserSession.shared.isLoggedIn {
-            // Show main app - programmatic TabBarController
-            window?.rootViewController = MainTabBarController()
-        } else {
-            // Show landing screen inside nav so Sign up / I have an account can push
-            window?.rootViewController = UINavigationController(rootViewController: LandingViewController())
-        }
+        // Show launch screen first (loading icon + glass), then it transitions to app
+        window?.rootViewController = LaunchViewController()
         
         window?.makeKeyAndVisible()
         

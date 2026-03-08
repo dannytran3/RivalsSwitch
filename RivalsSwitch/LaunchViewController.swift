@@ -2,14 +2,13 @@
 //  LaunchViewController.swift
 //  RivalsSwitch
 //
-//  Fully Programmatic Animated Launch Screen
+//  Launch screen – loading icon centered, original colors, no container
 //
 
 import UIKit
 
 class LaunchViewController: UIViewController {
     
-    // UI Elements
     private let iconImageView = UIImageView()
     private var gradientLayer: CAGradientLayer?
     
@@ -31,7 +30,6 @@ class LaunchViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = .appPrimaryBackground
         
-        // Add gradient background
         let gradient = CAGradientLayer()
         gradient.colors = [
             UIColor.appPrimaryBackground.cgColor,
@@ -42,17 +40,15 @@ class LaunchViewController: UIViewController {
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // Setup icon
         iconImageView.translatesAutoresizingMaskIntoConstraints = false
-        if let iconImage = UIImage(named: "AppIcon") ?? UIImage(named: "RS-icon") {
-            iconImageView.image = iconImage
-        }
+        var image = UIImage(named: "LoadingIcon") ?? UIImage(named: "RS-icon")
+        image = image?.withRenderingMode(.alwaysOriginal)
+        iconImageView.image = image
         iconImageView.contentMode = .scaleAspectFit
-        iconImageView.alpha = 0
-        iconImageView.transform = CGAffineTransform(scaleX: 0.5, y: 0.5)
+        iconImageView.backgroundColor = .clear
+        iconImageView.alpha = 1
         view.addSubview(iconImageView)
         
-        // Constraints
         NSLayoutConstraint.activate([
             iconImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             iconImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -62,39 +58,25 @@ class LaunchViewController: UIViewController {
     }
     
     private func animateLaunch() {
-        // Fade in and scale up animation
-        UIView.animate(withDuration: 0.8, delay: 0.2, options: .curveEaseOut, animations: {
-            self.iconImageView.alpha = 1.0
-            self.iconImageView.transform = CGAffineTransform(scaleX: 1.0, y: 1.0)
+        iconImageView.alpha = 0.9
+        iconImageView.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
+        UIView.animate(withDuration: 0.5, delay: 0.1, options: .curveEaseOut, animations: {
+            self.iconImageView.alpha = 1
+            self.iconImageView.transform = .identity
         }) { _ in
-            // Pulse animation
-            UIView.animate(withDuration: 1.0, delay: 0, options: [.repeat, .autoreverse], animations: {
-                self.iconImageView.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
-            })
-            
-            // Transition to landing screen after delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
                 self.transitionToApp()
             }
         }
     }
     
     private func transitionToApp() {
-        // Check if user is logged in
+        guard let window = view.window else { return }
         if UserSession.shared.isLoggedIn {
-            // Navigate to main app
-            if let windowScene = view.window?.windowScene,
-               let window = windowScene.windows.first {
-                window.rootViewController = MainTabBarController()
-                UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
-            }
+            window.rootViewController = MainTabBarController()
         } else {
-            // Navigate to landing screen
-            if let windowScene = view.window?.windowScene,
-               let window = windowScene.windows.first {
-                window.rootViewController = LandingViewController()
-                UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
-            }
+            window.rootViewController = UINavigationController(rootViewController: LandingViewController())
         }
+        UIView.transition(with: window, duration: 0.35, options: .transitionCrossDissolve, animations: nil)
     }
 }

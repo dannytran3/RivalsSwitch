@@ -132,10 +132,10 @@ class ProfileViewController: UIViewController {
     @objc private func logoutTapped() {
         UserSession.shared.logout()
         
-        // Navigate back to landing screen
+        // Navigate back to landing inside nav so Sign up / I have an account can push
         if let windowScene = view.window?.windowScene,
            let window = windowScene.windows.first {
-            window.rootViewController = LandingViewController()
+            window.rootViewController = UINavigationController(rootViewController: LandingViewController())
             UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
         }
     }
