@@ -8,9 +8,10 @@
 import UIKit
 import AVFoundation
 
+// sign-in code for returning users
 class LoginViewController: UIViewController {
     
-    // UI Elements
+    // Main UI elements
     private let logoImageView = UIImageView()
     private let titleLabel = UILabel()
     private let usernameLabel = UILabel()
@@ -36,6 +37,8 @@ class LoginViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupStyling()
+        
+        // Safety fallback in case this view is shown without navigation
         if navigationController == nil {
             let nav = UINavigationController(rootViewController: self)
             nav.modalPresentationStyle = .fullScreen
@@ -45,6 +48,8 @@ class LoginViewController: UIViewController {
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        
+        // Keep all background layers sized correctly
         gradientLayer?.frame = view.bounds
         playerLayer?.frame = view.bounds
         scrimLayer?.frame = view.bounds
@@ -59,6 +64,7 @@ class LoginViewController: UIViewController {
             glow2.frame = CGRect(x: -size * 0.35, y: view.bounds.maxY - size * 0.7, width: size, height: size)
         }
         
+        // Refresh gradient styling inside the login button
         loginButton.updateGradientFrame()
     }
     
@@ -76,7 +82,7 @@ class LoginViewController: UIViewController {
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // Background Video and Scrim
+        // Background Video and Scrim, add looping background video
         let videoURL = Bundle.main.url(forResource: "animated-background", withExtension: "mp4") ?? URL(fileURLWithPath: "/Users/danny/RivalsSwitch/RivalsSwitch/animated-background.mp4")
         let player = AVPlayer(url: videoURL)
         player.isMuted = true
@@ -107,6 +113,7 @@ class LoginViewController: UIViewController {
         view.layer.insertSublayer(scrim, above: vLayer)
         scrimLayer = scrim
         
+        // Loop background video
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { [weak player] _ in
             player?.seek(to: .zero)
             player?.play()
@@ -139,7 +146,7 @@ class LoginViewController: UIViewController {
         self.glowLayerTopRight = glowTR
         self.glowLayerBottomLeft = glowBL
         
-        // Logo Image - direct, no container
+        // Logo Image, direct, no container
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         logoImageView.contentMode = .scaleAspectFit
         logoImageView.backgroundColor = .clear

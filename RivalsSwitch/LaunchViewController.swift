@@ -7,6 +7,7 @@
 
 import UIKit
 
+// Launch screen shown before the app transitions user to the landing page or main app
 class LaunchViewController: UIViewController {
     
     private let iconImageView = UIImageView()
@@ -19,17 +20,22 @@ class LaunchViewController: UIViewController {
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        
+        // Start the launch animation when the view is visible
         animateLaunch()
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        
+        // Keep the gradient sized correctly during layout changes
         gradientLayer?.frame = view.bounds
     }
     
     private func setupUI() {
         view.backgroundColor = .appPrimaryBackground
         
+        // Add app background gradient
         let gradient = CAGradientLayer()
         gradient.colors = [
             UIColor.appPrimaryBackground.cgColor,
@@ -40,6 +46,7 @@ class LaunchViewController: UIViewController {
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
+        // Use the loading icon if it is available, else use the app icon
         iconImageView.translatesAutoresizingMaskIntoConstraints = false
         var image = UIImage(named: "LoadingIcon") ?? UIImage(named: "RS-icon")
         image = image?.withRenderingMode(.alwaysOriginal)
@@ -49,6 +56,7 @@ class LaunchViewController: UIViewController {
         iconImageView.alpha = 1
         view.addSubview(iconImageView)
         
+        // Center the loading icon on screen
         NSLayoutConstraint.activate([
             iconImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             iconImageView.centerYAnchor.constraint(equalTo: view.centerYAnchor),
@@ -57,6 +65,7 @@ class LaunchViewController: UIViewController {
         ])
     }
     
+    // Adds a small fade animation before entering the app
     private func animateLaunch() {
         iconImageView.alpha = 0.9
         iconImageView.transform = CGAffineTransform(scaleX: 0.85, y: 0.85)
@@ -70,6 +79,7 @@ class LaunchViewController: UIViewController {
         }
     }
     
+    // Sends the user either to the main app or the login/signup page
     private func transitionToApp() {
         guard let window = view.window else { return }
         if UserSession.shared.isLoggedIn {

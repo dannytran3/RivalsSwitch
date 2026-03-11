@@ -7,6 +7,7 @@
 
 import UIKit
 
+// For setting up the app window and deciding what screen the user sees first
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
@@ -15,14 +16,14 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
         guard let windowScene = scene as? UIWindowScene else { return }
         
+        // Create the main app window for this scene
         window = UIWindow(windowScene: windowScene)
         
-        // Show launch screen first (loading icon + glass), then it transitions to app
+        // Show the launch screen first, then transition into the app flow
         window?.rootViewController = LaunchViewController()
-        
         window?.makeKeyAndVisible()
         
-        // Style tab bar globally
+        // Apply shared styling for navigation bars and the tab bar, globally
         setupGlobalStyling()
     }
     

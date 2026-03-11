@@ -149,7 +149,7 @@ class ConfirmEnemyTeamViewController: UIViewController {
             textField.applyGlassmorphismStyle()
         }
         
-        // Done button - gradient
+        // Done button, gradient
         doneButton.applyGradientStyle()
     }
     

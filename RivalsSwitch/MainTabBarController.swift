@@ -7,6 +7,7 @@
 
 import UIKit
 
+// Main tab bar that holds all primary screens of the app
 class MainTabBarController: UITabBarController {
     
     override func viewDidLoad() {
@@ -14,7 +15,9 @@ class MainTabBarController: UITabBarController {
         setupTabBar()
     }
     
+    // Creates each tab and assigns icons/navigation controllers
     private func setupTabBar() {
+        
         // Create all view controllers
         let homeVC = HomeViewController()
         let matchVC = CameraScanViewController()
@@ -23,7 +26,8 @@ class MainTabBarController: UITabBarController {
         let settingsVC = SettingsViewController()
         let partyVC = PartyViewController()
         
-        // Wrap in navigation controllers
+        // Wrap each screen inside a navigation controller
+        // This allows pushing new screens inside each tab
         let homeNav = UINavigationController(rootViewController: homeVC)
         let matchNav = UINavigationController(rootViewController: matchVC)
         let historyNav = UINavigationController(rootViewController: historyVC)
@@ -31,7 +35,7 @@ class MainTabBarController: UITabBarController {
         let settingsNav = UINavigationController(rootViewController: settingsVC)
         let partyNav = UINavigationController(rootViewController: partyVC)
         
-        // Set tab bar items with SF Symbols
+        // Change tab icons and labels using SF Symbols
         homeNav.tabBarItem = UITabBarItem(title: "Home", image: UIImage(systemName: "house.fill"), tag: 0)
         matchNav.tabBarItem = UITabBarItem(title: "Match", image: UIImage(systemName: "camera.fill"), tag: 1)
         historyNav.tabBarItem = UITabBarItem(title: "History", image: UIImage(systemName: "clock.fill"), tag: 2)
@@ -39,10 +43,10 @@ class MainTabBarController: UITabBarController {
         settingsNav.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gearshape.fill"), tag: 4)
         partyNav.tabBarItem = UITabBarItem(title: "Party", image: UIImage(systemName: "person.2.fill"), tag: 5)
         
-        // Set view controllers
+        //Attach all tabs to the tab bar controller
         viewControllers = [homeNav, matchNav, historyNav, profileNav, settingsNav, partyNav]
         
-        // Apply styling
+        // styling across the tab bar
         tabBar.applyAppStyle()
     }
 }

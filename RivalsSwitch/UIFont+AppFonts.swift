@@ -10,7 +10,7 @@ import UIKit
 extension UIFont {
     // MARK: - Headings
     
-    /// Heading 1 - Screen titles (34pt, Bold)
+    // Heading 1 - Screen titles (34pt, Bold)
     static var appHeading1: UIFont {
         return UIFont.systemFont(ofSize: 34, weight: .bold)
     }

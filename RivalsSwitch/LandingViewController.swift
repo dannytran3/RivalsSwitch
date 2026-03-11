@@ -8,6 +8,8 @@
 import UIKit
 import AVFoundation
 
+// First page shown to logged-out users
+// They choose between signing up or logging in
 class LandingViewController: UIViewController {
     
     // UI Elements
@@ -28,6 +30,7 @@ class LandingViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         setupStyling()
+        // If this screen somehow loads without a navigation controller, create one so push navigation still works
         if navigationController == nil, let windowScene = view.window?.windowScene, let window = windowScene.windows.first {
             let nav = UINavigationController(rootViewController: self)
             window.rootViewController = nav
@@ -36,6 +39,8 @@ class LandingViewController: UIViewController {
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        
+        // Keep background layers sized correctly
         gradientLayer?.frame = view.bounds
         accentGradientLayer?.frame = view.bounds
         if let glow1 = glowLayerTopRight {
@@ -55,7 +60,7 @@ class LandingViewController: UIViewController {
     private func setupUI() {
         view.backgroundColor = .appPrimaryBackground
         
-        // Gradient Background (behind video so video is visible)
+        // Gradient Background, behind video so video can be seen
         let gradient = CAGradientLayer()
         gradient.colors = [
             UIColor.appPrimaryBackground.cgColor,
@@ -66,7 +71,7 @@ class LandingViewController: UIViewController {
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // Animated background video and scrim (video above gradient so it shows)
+        // Animated background video and scrim, the looping background video
         let videoURL = Bundle.main.url(forResource: "animated-background", withExtension: "mp4") ?? URL(fileURLWithPath: "/Users/danny/RivalsSwitch/RivalsSwitch/animated-background.mp4")
         let player = AVPlayer(url: videoURL)
         player.isMuted = true
@@ -78,7 +83,7 @@ class LandingViewController: UIViewController {
         view.layer.insertSublayer(vLayer, above: gradient)
         playerLayer = vLayer
         
-        // Dark overlay on lower half so content is readable; gradient from mid to bottom
+        // Dark overlay on lower half so content is readable, gradient from mid to bottom
         let scrim = CAGradientLayer()
         scrim.colors = [
             UIColor.clear.cgColor,
@@ -92,6 +97,7 @@ class LandingViewController: UIViewController {
         view.layer.insertSublayer(scrim, above: vLayer)
         scrimLayer = scrim
         
+        // Loop the video forever
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { [weak player] _ in
             player?.seek(to: .zero)
             player?.play()
@@ -127,7 +133,7 @@ class LandingViewController: UIViewController {
         self.glowLayerTopRight = glowTR
         self.glowLayerBottomLeft = glowBL
         
-        // Logo Image - direct, no container
+        // Logo Image,  direct, no container
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         logoImageView.contentMode = .scaleAspectFit
         logoImageView.backgroundColor = .clear
@@ -189,15 +195,16 @@ class LandingViewController: UIViewController {
         // Hide navigation bar
         navigationController?.setNavigationBarHidden(true, animated: false)
         
-        // Sign Up Button - Yellow glass container (like I have an account)
+        // Sign Up Button, Yellow glass container (like I have an account)
         signUpButton.applyYellowGlassStyle()
         signUpButton.setTitle("Sign up", for: .normal)
         
-        // Have Account Button - Glassmorphism style
+        // Have Account Button, Glassmorphism style
         haveAccountButton.applyGlassmorphismStyle()
         haveAccountButton.setTitle("I have an account", for: .normal)
         haveAccountButton.titleLabel?.font = .appButtonTextMedium
         haveAccountButton.setTitleColor(.appPrimaryText, for: .normal)
+        
         // Ensure title label is on top after style is applied
         if let titleLabel = haveAccountButton.titleLabel {
             haveAccountButton.bringSubviewToFront(titleLabel)
@@ -207,11 +214,13 @@ class LandingViewController: UIViewController {
         subtitleLabel.textColor = .appPrimaryText
     }
     
+    //User presses signup Button
     @objc private func signUpTapped() {
         let createAccountVC = CreateAccountViewController()
         navigationController?.pushViewController(createAccountVC, animated: true)
     }
     
+    //User presses have account Button
     @objc private func haveAccountTapped() {
         let loginVC = LoginViewController()
         navigationController?.pushViewController(loginVC, animated: true)

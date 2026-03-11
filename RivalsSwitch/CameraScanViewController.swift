@@ -8,10 +8,10 @@
 import UIKit
 import Vision
 
+// Handles the full photo scanning flow, take/selects image, run OCR, extract stats, then move to confirmation screens
 class CameraScanViewController: UIViewController, UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     
-    // MARK: - OCR Models
-    
+    // Represents one OCR text observation and some extra info that helps group text into scoreboard rows
     private struct OCRItem {
         let text: String
         let rect: CGRect
@@ -20,6 +20,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         let yellowScore: CGFloat
     }
     
+    // Represents one grouped scoreboard row from OCR results
     private struct OCRRow {
         let texts: [String]
         let frame: CGRect
@@ -44,6 +45,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
 
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        // Set up image picker and screen UI
         imagePicker.delegate = self
         setupUI()
         setupStyling()
@@ -51,6 +54,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        
+        // Keep background and gradient button styling updated on layout changes
         gradientLayer?.frame = view.bounds
         usePhotoButton.updateGradientFrame()
     }
@@ -69,7 +74,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // Photo Image View
+        // Image view used to preview the selected scoreboard photo
         photoImageView.translatesAutoresizingMaskIntoConstraints = false
         photoImageView.backgroundColor = .appSecondaryBackground
         photoImageView.contentMode = .scaleAspectFit
@@ -78,7 +83,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         photoImageView.layer.borderColor = UIColor.appBorderColor.cgColor
         view.addSubview(photoImageView)
         
-        // Detected Heroes Label
+        // Label that shows scan status to the user
         detectedHeroesLabel.translatesAutoresizingMaskIntoConstraints = false
         detectedHeroesLabel.text = "Take a photo of the scoreboard"
         detectedHeroesLabel.textAlignment = .center
@@ -147,14 +152,14 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         detectedHeroesLabel.applyBodyMediumStyle()
         detectedHeroesLabel.textColor = .appSecondaryText
         
-        // Take Photo Button - glassmorphism
+        // Take Photo Button, glassmorphism
         takePhotoButton.applyGlassmorphismStyle()
         takePhotoButton.setTitle("Take Photo", for: .normal)
         
-        // Use Photo Button - gradient
+        // Use Photo Button, gradient
         usePhotoButton.applyGradientStyle()
         
-        // Retake Photo Button - secondary
+        // Retake Photo Button, secondary
         retakePhotoButton.applySecondaryStyle()
     }
 
@@ -177,15 +182,18 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
 
     @objc private func usePhotoTapped() {
+        // Do not continue if no image was selected
         guard let image = photoImageView.image else {
             showAlert(title: "No Photo", message: "Please take or select a photo first.")
             return
         }
 
+        // Start OCR on the selected photo
         runOCR(on: image)
     }
 
     @objc private func retakePhotoTapped() {
+        // Reset the screen and clear any saved match data
         photoImageView.image = nil
         detectedHeroesLabel.text = "Take a photo of the scoreboard"
         MatchStore.shared.clearCurrentMatch()
@@ -196,6 +204,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
 
     func imagePickerController(_ picker: UIImagePickerController,
                                didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
+        // Load the chosen image into the preview
         if let image = info[.originalImage] as? UIImage {
             photoImageView.image = image
             detectedHeroesLabel.text = "Photo Loaded"
@@ -217,7 +226,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             return
         }
 
-        // Create a Vision text recognition request
+        // Create Vision request for text recognition
         let request = VNRecognizeTextRequest { [weak self] request, error in
             guard let self = self else { return }
 
@@ -235,13 +244,14 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
         }
 
-        // Use accurate recognition for scoreboard text
+        // Use more accurate recognition settings for scoreboard text
         request.recognitionLevel = .accurate
         request.usesLanguageCorrection = false
         request.recognitionLanguages = ["en-US"]
 
         let handler = VNImageRequestHandler(cgImage: cgImage, options: [:])
 
+        // Run OCR off the main thread so the UI stays responsive
         DispatchQueue.global(qos: .userInitiated).async {
             do {
                 try handler.perform([request])
@@ -265,6 +275,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             print(row.texts, "yellow:", row.yellowScore, "frame:", row.frame)
         }
         
+        // Clear any previous in-progress match data before saving new OCR results
         MatchStore.shared.clearCurrentMatch()
         
         // Parse the selected player row first, then hero separately
@@ -286,6 +297,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
 
     private func buildRows(from observations: [VNRecognizedTextObservation], in image: UIImage) -> [OCRRow] {
+        
+        // Convert Vision observations into OCR items with helpful geometry info
         let items: [OCRItem] = observations.compactMap { observation in
             guard let candidate = observation.topCandidates(1).first else { return nil }
             
@@ -323,6 +336,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         
         var groupedRows: [[OCRItem]] = []
         
+        // Group nearby OCR items into the same logical scoreboard row
         for item in sorted {
             if let lastIndex = groupedRows.indices.last {
                 let lastRowY = groupedRows[lastIndex].map(\.midY).reduce(0, +) / CGFloat(groupedRows[lastIndex].count)
@@ -338,6 +352,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
         }
         
+        // Convert grouped items into row models
         return groupedRows.map { row in
             let ordered = row.sorted { $0.minX < $1.minX }
             let texts = ordered.map(\.text)
@@ -357,6 +372,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     private func findSelectedPlayerRow(from rows: [OCRRow]) -> OCRRow? {
+        // If the user has a saved username, try matching against that first
         let savedUsername = UserDefaults.standard
             .string(forKey: "username")?
             .lowercased()
@@ -376,6 +392,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
         }
 
+        // Otherwise, guess the selected row by looking for row-like patterns and yellow highlighting
+
         let candidateRows = rows.filter { row in
             let rowText = row.texts.joined(separator: " ").lowercased()
             let smallNumbers = extractSmallIntegers(from: rowText)
@@ -391,7 +409,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         for row in candidateRows {
             print(row.texts, "yellow:", row.yellowScore)
         }
-
+        
+        // The selected row is usually highlighted more strongly in yellow
         return candidateRows.max { $0.yellowScore < $1.yellowScore }
     }
     
@@ -400,7 +419,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         print("SELECTED ROW FRAME:", selectedRow.frame)
         print("SELECTED ROW YELLOW:", selectedRow.yellowScore)
         
-        // Build regions relative to the selected row
+        // Estimate subregions of the selected row for username and K/D/A columns
         let usernameBox = CGRect(
             x: selectedRow.frame.minX + selectedRow.frame.width * 0.22,
             y: selectedRow.frame.minY - selectedRow.frame.height * 0.15,
@@ -429,6 +448,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             height: selectedRow.frame.height * 1.30
         )
         
+        // Pull OCR text found inside each estimated region
         let usernameTexts = texts(in: usernameBox, from: observations)
         let killTexts = texts(in: killsBox, from: observations)
         let deathTexts = texts(in: deathsBox, from: observations)
@@ -439,6 +459,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         print("DEATHS BOX:", deathTexts)
         print("ASSISTS BOX:", assistTexts)
         
+        // Save the best OCR results into the shared match store
         let username = bestUsername(from: usernameTexts)
         let kills = firstInteger(in: killTexts.joined(separator: " "))
         let deaths = firstInteger(in: deathTexts.joined(separator: " "))
@@ -461,7 +482,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
 
             let rect = observation.boundingBox
 
-            // Hero label is usually in the lower-left panel
+            // Hero label is usually in the lower-left panel of the screenshot
             if rect.midY < 0.28 && rect.minX < 0.30 {
                 for hero in knownHeroes {
                     let distance = levenshteinDistance(text, normalizedOCRText(hero))
@@ -483,6 +504,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     private func texts(in region: CGRect, from observations: [VNRecognizedTextObservation]) -> [String] {
+        
+        // Return OCR strings whose bounding boxes overlap the requested region
         observations.compactMap { observation in
             guard let candidate = observation.topCandidates(1).first else { return nil }
             
@@ -495,6 +518,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     private func bestUsername(from texts: [String]) -> String? {
+        
+        // Choose the longest reasonable OCR token that is not a hero name
         let cleaned = texts
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
@@ -508,6 +533,8 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     private func firstInteger(in text: String) -> Int? {
+        
+        // Extract the first integer found in a text blob
         let numbers = text
             .components(separatedBy: CharacterSet.decimalDigits.inverted)
             .compactMap { Int($0) }
@@ -516,12 +543,16 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     private func extractSmallIntegers(from text: String) -> [Int] {
+        
+        // Useful for identifying scoreboard rows that contain K/D/A-like values
         text.components(separatedBy: CharacterSet.decimalDigits.inverted)
             .compactMap { Int($0) }
             .filter { $0 >= 0 && $0 <= 99 }
     }
     
     private func containsUsernameLikeToken(in texts: [String]) -> Bool {
+        
+        // Heuristic for whether a row likely contains a username
         for token in texts {
             let trimmed = token.trimmingCharacters(in: .whitespacesAndNewlines)
             let lower = trimmed.lowercased()
@@ -545,6 +576,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         let imageWidth = CGFloat(cgImage.width)
         let imageHeight = CGFloat(cgImage.height)
         
+        // Convert normalized Vision coordinates into pixel coordinates
         let pixelRect = CGRect(
             x: normalizedRect.minX * imageWidth,
             y: (1.0 - normalizedRect.maxY) * imageHeight,
@@ -552,6 +584,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             height: normalizedRect.height * imageHeight
         ).integral
         
+        // Sample the average color of this OCR region
         guard pixelRect.width > 0, pixelRect.height > 0 else { return 0 }
         guard let cropped = cgImage.cropping(to: pixelRect) else { return 0 }
         
@@ -559,6 +592,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
         var rawData = [UInt8](repeating: 0, count: 4)
         
+        // Sample the average color of this OCR region
         guard let context = CGContext(
             data: &rawData,
             width: 1,
@@ -577,11 +611,13 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         let green = CGFloat(rawData[1]) / 255.0
         let blue = CGFloat(rawData[2]) / 255.0
         
-        // Yellow text should have high red and green, with lower blue
+        // Selected scoreboard text tends to have strong yellow values
         return (red + green) - blue
     }
 
     private func levenshteinDistance(_ lhs: String, _ rhs: String) -> Int {
+        
+        // Standard edit distance used to compare OCR results to known text
         let a = Array(lhs)
         let b = Array(rhs)
 
@@ -616,12 +652,16 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     private func normalizedOCRText(_ text: String) -> String {
+        
+        // Normalize OCR text for easier fuzzy matching
         text.lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .joined()
     }
     
     private func showAlert(title: String, message: String) {
+        
+        // Small helper for error/status messages
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))
         present(alert, animated: true)

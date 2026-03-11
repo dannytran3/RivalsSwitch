@@ -7,6 +7,7 @@
 
 import UIKit
 
+// Main home screen shown after login, gives quick access to match scanning, history, and party features
 class HomeViewController: UIViewController {
 
     // UI Elements
@@ -97,7 +98,6 @@ class HomeViewController: UIViewController {
         heroCard.addSubview(logoImageView)
         
         // appNameLabel setup removed per instructions
-        
         taglineLabel.translatesAutoresizingMaskIntoConstraints = false
         taglineLabel.text = "Scan to generate counter picks"
         taglineLabel.textAlignment = .left
@@ -112,7 +112,7 @@ class HomeViewController: UIViewController {
         }
         heroCard.addSubview(userLabel)
 
-        // 2. Primary CTA Card
+        // Primary CTA Card
         primaryCTACard.translatesAutoresizingMaskIntoConstraints = false
         primaryCTACard.applyGradientStyle()
         primaryCTACard.layer.cornerRadius = 28
@@ -128,7 +128,7 @@ class HomeViewController: UIViewController {
         primaryCTACard.layer.borderWidth = 1
         
         contentView.addSubview(primaryCTACard)
-        // CTA content stack (fixes padding/margins and keeps layout predictable)
+        // CTA content stack, fixes padding/margins and keeps layout predictable
         ctaStack.translatesAutoresizingMaskIntoConstraints = false
         ctaStack.axis = .vertical
         ctaStack.alignment = .center
@@ -164,13 +164,14 @@ class HomeViewController: UIViewController {
         quickActionsHeaderLabel.text = "Quick actions"
         contentView.addSubview(quickActionsHeaderLabel)
 
-        // 3. Quick Actions
+        // Quick action buttons row
         quickActionsStack.translatesAutoresizingMaskIntoConstraints = false
         quickActionsStack.axis = .horizontal
         quickActionsStack.spacing = 16
         quickActionsStack.distribution = .fillEqually
         contentView.addSubview(quickActionsStack)
 
+        // Party button
         scanPhotoCard.translatesAutoresizingMaskIntoConstraints = false
         scanPhotoCard.applyCardStyle()
         scanPhotoCard.setTitle("Start a Party", for: .normal)
@@ -185,6 +186,7 @@ class HomeViewController: UIViewController {
         }
         quickActionsStack.addArrangedSubview(scanPhotoCard)
 
+        // History button
         manualEntryCard.translatesAutoresizingMaskIntoConstraints = false
         manualEntryCard.applyCardStyle()
         manualEntryCard.setTitle("View History", for: .normal)
@@ -199,7 +201,7 @@ class HomeViewController: UIViewController {
         }
         quickActionsStack.addArrangedSubview(manualEntryCard)
 
-        // Recent Header
+        // Recent match section header
         recentHeaderLabel.translatesAutoresizingMaskIntoConstraints = false
         recentHeaderLabel.text = "Recent"
         contentView.addSubview(recentHeaderLabel)
@@ -220,7 +222,7 @@ class HomeViewController: UIViewController {
         recentMatchDetail.numberOfLines = 0
         recentMatchCard.addSubview(recentMatchDetail)
 
-        // Constraints
+        // Layout all sections
         NSLayoutConstraint.activate([
             heroCard.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20),
             heroCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
@@ -326,19 +328,20 @@ class HomeViewController: UIViewController {
         }
     }
 
-    /// Loads and displays info for the most recent match
+    // Loads the most recently saved match and shows it on the home screen
     private func loadLastMatch() {
         let matches = MatchStore.shared.loadMatches()
         guard let last = matches.last else {
             recentMatchDetail.text = "No matches yet."
             return
         }
-        // TODO: Replace with your real parsing logic
         recentMatchDetail.text = last
     }
     
-    // MARK: - Actions
+    
     @objc private func startNewMatchTapped() {
+        
+        // Clear old match data before starting fresh
         MatchStore.shared.clearCurrentMatch()
         let cameraVC = CameraScanViewController()
         navigationController?.pushViewController(cameraVC, animated: true)
@@ -360,8 +363,7 @@ class HomeViewController: UIViewController {
     }
     
     @objc private func startPartyTapped() {
-        // TODO: Navigate to a dedicated Party screen when available
-        // For now, reuse the camera flow to start a new session
+        // Temporary shortcut until a full party flow is added
         startNewMatchTapped()
     }
 }

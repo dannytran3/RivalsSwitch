@@ -9,7 +9,7 @@ import UIKit
 import ObjectiveC
 
 extension UIButton {
-    /// Applies primary button styling (gold background, white text)
+    // Applies primary button styling (gold background, white text)
     func applyPrimaryStyle() {
         backgroundColor = .appPrimaryAccent
         setTitleColor(.appPrimaryText, for: .normal)
@@ -18,7 +18,7 @@ extension UIButton {
         contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
     }
     
-    /// Applies secondary button styling (transparent with gold border)
+    // Applies secondary button styling (transparent with gold border)
     func applySecondaryStyle() {
         backgroundColor = .clear
         setTitleColor(.appPrimaryAccent, for: .normal)
@@ -29,7 +29,7 @@ extension UIButton {
         contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
     }
     
-    /// Applies tertiary button styling (text only)
+    // Applies tertiary button styling (text only)
     func applyTertiaryStyle() {
         backgroundColor = .clear
         setTitleColor(.appSecondaryText, for: .normal)
@@ -37,7 +37,7 @@ extension UIButton {
         contentEdgeInsets = UIEdgeInsets(top: 12, left: 12, bottom: 12, right: 12)
     }
     
-    /// Applies an outlined button with a horizontal gradient stroke
+    // Applies an outlined button with a horizontal gradient stroke
     func applyGradientOutlineStyle() {
         // Clear any existing gradient layers
         layer.sublayers?.filter { $0.name == "gradientOutlineLayer" }.forEach { $0.removeFromSuperlayer() }
@@ -71,7 +71,7 @@ extension UIButton {
         objc_setAssociatedObject(self, "gradientOutlineLayer", gradient, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
     
-    /// Applies gradient button style (orange to yellow gradient)
+    // Applies gradient button style (orange to yellow gradient)
     func applyGradientStyle() {
         // Remove any existing gradient layers
         layer.sublayers?.filter { $0 is CAGradientLayer }.forEach { $0.removeFromSuperlayer() }
@@ -99,7 +99,7 @@ extension UIButton {
         objc_setAssociatedObject(self, "gradientLayer", gradientLayer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
     }
     
-    /// Updates gradient frame - call this in viewDidLayoutSubviews
+    // Updates gradient frame - call this in viewDidLayoutSubviews
     func updateGradientFrame() {
         if let gradientLayer = objc_getAssociatedObject(self, "gradientLayer") as? CAGradientLayer {
             gradientLayer.frame = bounds
@@ -113,7 +113,7 @@ extension UIButton {
         }
     }
     
-    /// Applies glassmorphism style (frosted glass effect)
+    // Applies glassmorphism style (frosted glass effect)
     func applyGlassmorphismStyle() {
         backgroundColor = UIColor.white.withAlphaComponent(0.1)
         layer.cornerRadius = 16
@@ -140,7 +140,7 @@ extension UIButton {
         }
     }
     
-    /// Applies yellow/gold glass style – glass container with vibrant gold border to match app accent
+    // Applies yellow/gold glass style – glass container with vibrant gold border to match app accent
     func applyYellowGlassStyle() {
         subviews.filter { $0 is UIVisualEffectView || $0.tag == 9001 }.forEach { $0.removeFromSuperview() }
         
@@ -177,7 +177,7 @@ extension UIButton {
 }
 
 extension UITextField {
-    /// Applies app text field styling
+    // Applies app text field styling
     func applyAppStyle() {
         backgroundColor = .appSecondaryBackground
         textColor = .appPrimaryText // White text
@@ -205,7 +205,7 @@ extension UITextField {
         }
     }
     
-    /// Applies glassmorphism style to text field
+    // Applies glassmorphism style to text field
     func applyGlassmorphismStyle() {
         backgroundColor = UIColor.white.withAlphaComponent(0.1)
         textColor = .appPrimaryText
@@ -243,7 +243,7 @@ extension UITextField {
         }
     }
     
-    /// Updates border color when focused
+    // Updates border color when focused
     func updateFocusState(_ isFocused: Bool) {
         if isFocused {
             layer.borderColor = UIColor.appPrimaryAccent.cgColor
@@ -254,7 +254,7 @@ extension UITextField {
         }
     }
     
-    /// Enables a trailing eye icon to toggle secure text entry
+    // Enables a trailing eye icon to toggle secure text entry
     func enablePasswordToggle() {
         isSecureTextEntry = true
         let button = UIButton(type: .system)
@@ -288,37 +288,37 @@ extension UITextField {
 }
 
 extension UILabel {
-    /// Applies heading 1 style
+    // Applies heading 1 style
     func applyHeading1Style() {
         font = .appHeading1
         textColor = .appPrimaryText // White
     }
     
-    /// Applies heading 2 style
+    // Applies heading 2 style
     func applyHeading2Style() {
         font = .appHeading2
         textColor = .appPrimaryText // White
     }
     
-    /// Applies heading 3 style
+    // Applies heading 3 style
     func applyHeading3Style() {
         font = .appHeading3
         textColor = .appPrimaryText // White
     }
     
-    /// Applies body large style
+    // Applies body large style
     func applyBodyLargeStyle() {
         font = .appBodyLarge
         textColor = .appSecondaryText // Light gray
     }
     
-    /// Applies body medium style
+    // Applies body medium style
     func applyBodyMediumStyle() {
         font = .appBodyMedium
         textColor = .appSecondaryText // Light gray
     }
     
-    /// Applies body small style
+    // Applies body small style
     func applyBodySmallStyle() {
         font = .appBodySmall
         textColor = .appTertiaryText // Medium gray
@@ -326,7 +326,7 @@ extension UILabel {
 }
 
 extension UIView {
-    /// Applies card styling
+    // Applies card styling
     func applyCardStyle(elevated: Bool = false) {
         backgroundColor = elevated ? .appTertiaryBackground : .appSecondaryBackground
         layer.cornerRadius = 16
@@ -338,7 +338,7 @@ extension UIView {
 }
 
 extension UINavigationBar {
-    /// Applies app navigation bar styling
+    // Applies app navigation bar styling
     func applyAppStyle() {
         let appearance = UINavigationBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -360,7 +360,7 @@ extension UINavigationBar {
 }
 
 extension UITabBar {
-    /// Applies app tab bar styling
+    // Applies app tab bar styling
     func applyAppStyle() {
         let appearance = UITabBarAppearance()
         appearance.configureWithOpaqueBackground()
@@ -387,7 +387,7 @@ extension UITabBar {
 }
 
 extension UIViewController {
-    /// Styles all buttons in the view hierarchy
+    // Styles all buttons in the view hierarchy
     func styleAllButtons() {
         styleButtons(in: view)
     }
@@ -415,7 +415,7 @@ extension UIViewController {
         }
     }
     
-    /// Styles all labels in the view hierarchy with default app styles
+    // Styles all labels in the view hierarchy with default app styles
     func styleAllLabels() {
         styleLabels(in: view)
     }

@@ -8,6 +8,7 @@
 import UIKit
 import AVFoundation
 
+// Handles account creation for new users
 class CreateAccountViewController: UIViewController {
     
     // UI Elements
@@ -40,6 +41,8 @@ class CreateAccountViewController: UIViewController {
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+        
+        // Keep layered backgrounds and button styling aligned with the view size
         gradientLayer?.frame = view.bounds
         
         playerLayer?.frame = view.bounds
@@ -91,6 +94,7 @@ class CreateAccountViewController: UIViewController {
 
         // Scrim for lower half
         let scrim = CAGradientLayer()
+        
         // Dark overlay on lower half (match Landing) so content is readable
         scrim.colors = [
             UIColor.clear.cgColor,
@@ -104,12 +108,14 @@ class CreateAccountViewController: UIViewController {
         view.layer.insertSublayer(scrim, above: vLayer)
         scrimLayer = scrim
 
+        // Keep the video looping
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { [weak player] _ in
             player?.seek(to: .zero)
             player?.play()
         }
         player.play()
         
+        // Accent overlay
         let accent = CAGradientLayer()
         accent.colors = [UIColor.appSecondaryAccent.withAlphaComponent(0.25).cgColor, UIColor.clear.cgColor]
         accent.locations = [0.0, 1.0]
@@ -118,6 +124,7 @@ class CreateAccountViewController: UIViewController {
         view.layer.insertSublayer(accent, at: 1)
         accentGradientLayer = accent
         
+        // Background gradient
         let makeGlow: (UIColor) -> CAGradientLayer = { color in
             let g = CAGradientLayer()
             g.type = .radial
@@ -134,7 +141,7 @@ class CreateAccountViewController: UIViewController {
         self.glowLayerTopRight = glowTR
         self.glowLayerBottomLeft = glowBL
         
-        // Logo Image - direct, no container
+        // Logo Image, direct, no container
         logoImageView.translatesAutoresizingMaskIntoConstraints = false
         logoImageView.contentMode = .scaleAspectFit
         logoImageView.backgroundColor = .clear
@@ -156,6 +163,7 @@ class CreateAccountViewController: UIViewController {
         titleLabel.textAlignment = .center
         view.addSubview(titleLabel)
         
+        // Field labels
         usernameLabel.translatesAutoresizingMaskIntoConstraints = false
         usernameLabel.text = "Username"
         view.addSubview(usernameLabel)
@@ -239,7 +247,7 @@ class CreateAccountViewController: UIViewController {
             signInLinkButton.heightAnchor.constraint(equalToConstant: 44)
         ])
         
-        // Text field observers
+        // Add focus styling to text fields while editing
         [usernameTextField, passwordTextField, confirmPasswordTextField].forEach { textField in
             textField.addTarget(self, action: #selector(textFieldDidBeginEditing(_:)), for: .editingDidBegin)
             textField.addTarget(self, action: #selector(textFieldDidEndEditing(_:)), for: .editingDidEnd)
@@ -268,6 +276,7 @@ class CreateAccountViewController: UIViewController {
         confirmPasswordTextField.applyGlassmorphismStyle()
         passwordTextField.enablePasswordToggle()
         confirmPasswordTextField.enablePasswordToggle()
+        
         // Lighter placeholders for visibility over video
         [usernameTextField, passwordTextField, confirmPasswordTextField].forEach { field in
             guard let placeholderText = field.placeholder else { return }
@@ -291,6 +300,8 @@ class CreateAccountViewController: UIViewController {
     }
     
     @objc private func createAccountTapped() {
+        
+        // Make sure every field was filled in
         guard let username = usernameTextField.text, !username.isEmpty,
               let password = passwordTextField.text, !password.isEmpty,
               let confirmPassword = confirmPasswordTextField.text, !confirmPassword.isEmpty else {
@@ -298,11 +309,13 @@ class CreateAccountViewController: UIViewController {
             return
         }
         
+        // Make sure both passwords match
         guard password == confirmPassword else {
             showAlert(title: "Password Mismatch", message: "Passwords do not match.")
             return
         }
 
+        // Register the new account
         UserSession.shared.register(username: username, password: password)
         
         // Navigate to app programmatically
@@ -314,9 +327,11 @@ class CreateAccountViewController: UIViewController {
     }
     
     @objc private func signInTapped() {
+        // Return to the login screen
         navigationController?.popViewController(animated: true)
     }
 
+    // Reusable alert helper
     private func showAlert(title: String, message: String) {
         let alert = UIAlertController(title: title, message: message, preferredStyle: .alert)
         alert.addAction(UIAlertAction(title: "OK", style: .default))

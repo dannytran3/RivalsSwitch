@@ -78,7 +78,7 @@ class ProfileViewController: UIViewController {
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // ScrollView & ContentView
+        // ScrollView and ContentView
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         contentView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
@@ -395,7 +395,7 @@ class ProfileViewController: UIViewController {
         accountCard.applyCardStyle()
         contentView.addSubview(accountCard)
         
-        // Logout button - now smaller and within a card
+        // Logout button, now smaller and within a card
         logoutButton.translatesAutoresizingMaskIntoConstraints = false
         logoutButton.contentHorizontalAlignment = .leading
         logoutButton.setTitle("  Logout", for: .normal)
@@ -557,8 +557,6 @@ class ProfileViewController: UIViewController {
         }
     }
     
-    // MARK: - Actions
-    
     @objc private func editProfileTapped() {
         let alert = UIAlertController(
             title: "Edit Profile",
@@ -629,7 +627,6 @@ class ProfileViewController: UIViewController {
         alert.addAction(UIAlertAction(title: "Remove Photo", style: .destructive) { [weak self] _ in
             self?.avatarImageView.image = UIImage(systemName: "person.circle.fill")
             self?.avatarImageView.tintColor = .appPrimaryAccent
-            // TODO: Clear stored photo data
         })
         
         alert.addAction(UIAlertAction(title: "Cancel", style: .cancel))
@@ -648,12 +645,12 @@ class ProfileViewController: UIViewController {
     @objc private func viewHistoryTapped() {
         // Navigate to History tab
         if let tabBar = self.tabBarController {
-            tabBar.selectedIndex = 1 // Assuming History is at index 1
+            // Assuming History is at index 1
+            tabBar.selectedIndex = 1
         }
     }
     
     @objc private func exportTapped() {
-        // TODO: Implement export/share functionality
         let alert = UIAlertController(
             title: "Export / Share",
             message: "This feature will allow you to share your match summaries. Coming soon!",
@@ -664,7 +661,6 @@ class ProfileViewController: UIViewController {
     }
     
     @objc private func helpTapped() {
-        // TODO: Show help/tutorial screen
         let alert = UIAlertController(
             title: "How it works",
             message: "1. Tap 'Start New Match' on the home screen\n2. Scan your scoreboard photo\n3. Confirm your stats\n4. Get counter-pick recommendations\n5. Review your match history",
@@ -686,8 +682,6 @@ class ProfileViewController: UIViewController {
     }
 }
 
-// MARK: - UIImagePickerControllerDelegate
-
 extension ProfileViewController: UIImagePickerControllerDelegate, UINavigationControllerDelegate {
     func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey : Any]) {
         picker.dismiss(animated: true)
@@ -702,7 +696,6 @@ extension ProfileViewController: UIImagePickerControllerDelegate, UINavigationCo
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.tintColor = nil // Remove tint since we're using a real image
         
-        // TODO: Save the image to UserDefaults or file system
         // Example: Save to UserDefaults
         if let imageData = selectedImage.jpegData(compressionQuality: 0.8) {
             UserDefaults.standard.set(imageData, forKey: "userProfileImage")
