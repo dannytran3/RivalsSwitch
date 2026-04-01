@@ -4,6 +4,18 @@
 //
 //  Reusable SwiftUI component for loading hero images from remote URLs
 //
+//  Features:
+//  - Async loading from Rivalskins CDN
+//  - Loading indicator during fetch
+//  - Role-based fallback placeholders on error
+//  - Automatic caching via AsyncImage
+//  - Customizable content mode (fill/fit)
+//
+//  Usage:
+//    HeroImageView(slug: "spider-man")
+//      .frame(width: 200, height: 200)
+//      .clipShape(RoundedRectangle(cornerRadius: 12))
+//
 
 import SwiftUI
 
@@ -28,6 +40,7 @@ struct HeroImageView: View {
                         
                         ProgressView()
                             .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                            .scaleEffect(0.8)
                     }
                     
                 case .success(let image):
@@ -56,9 +69,15 @@ struct HeroImageView: View {
         ZStack {
             placeholderBackground(for: role)
             
-            Image(systemName: iconName(for: role))
-                .font(.system(size: 40, weight: .light))
-                .foregroundColor(.white.opacity(0.5))
+            VStack(spacing: 8) {
+                Image(systemName: iconName(for: role))
+                    .font(.system(size: 40, weight: .light))
+                    .foregroundColor(.white.opacity(0.5))
+                
+                Text(role.rawValue.capitalized)
+                    .font(.caption2)
+                    .foregroundColor(.white.opacity(0.4))
+            }
         }
     }
     
@@ -67,7 +86,8 @@ struct HeroImageView: View {
         LinearGradient(
             colors: [
                 HeroRegistry.shared.roleColorSwiftUI(role: role).opacity(0.3),
-                HeroRegistry.shared.roleColorSwiftUI(role: role).opacity(0.1)
+                HeroRegistry.shared.roleColorSwiftUI(role: role).opacity(0.1),
+                Color(hex: "1A1A2E")
             ],
             startPoint: .topLeading,
             endPoint: .bottomTrailing

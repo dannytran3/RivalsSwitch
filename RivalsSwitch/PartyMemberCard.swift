@@ -26,34 +26,42 @@ struct PartyMemberCard: View {
     }
     
     var body: some View {
-        Button(action: {
-            onTap()
-        }) {
-            ZStack {
-                if let member = member {
-                    // Occupied slot
+        ZStack {
+            if let member = member {
+                // Occupied slot - interactive
+                Button(action: {
+                    onTap()
+                }) {
                     occupiedCard(member: member)
-                } else {
-                    // Empty slot
-                    emptyCard()
+                        .frame(height: 140)
+                        .clipShape(RoundedRectangle(cornerRadius: 16))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16)
+                                .stroke(borderColor, lineWidth: borderWidth)
+                        )
+                        .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: 4)
+                        .scaleEffect(isPressed ? 0.97 : 1.0)
+                        .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
                 }
+                .buttonStyle(PlainButtonStyle())
+                .simultaneousGesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { _ in isPressed = true }
+                        .onEnded { _ in isPressed = false }
+                )
+            } else {
+                // Empty slot - non-interactive
+                emptyCard()
+                    .frame(height: 140)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(borderColor, lineWidth: borderWidth)
+                    )
+                    .shadow(color: shadowColor, radius: shadowRadius, x: 0, y: 4)
+                    .allowsHitTesting(false) // Empty slots don't capture touches
             }
-            .frame(height: 160)
-            .clipShape(RoundedRectangle(cornerRadius: 16))
-            .overlay(
-                RoundedRectangle(cornerRadius: 16)
-                    .stroke(borderColor, lineWidth: isCurrentUser ? 3 : 1.5)
-            )
-            .shadow(color: Color.black.opacity(0.3), radius: 8, x: 0, y: 4)
-            .scaleEffect(isPressed ? 0.95 : 1.0)
-            .animation(.spring(response: 0.3, dampingFraction: 0.6), value: isPressed)
         }
-        .buttonStyle(PlainButtonStyle())
-        .simultaneousGesture(
-            DragGesture(minimumDistance: 0)
-                .onChanged { _ in isPressed = true }
-                .onEnded { _ in isPressed = false }
-        )
     }
     
     private func occupiedCard(member: PartyMember) -> some View {
@@ -65,115 +73,94 @@ struct PartyMemberCard: View {
                 defaultBackground()
             }
             
-            // Dark gradient overlay for readability
+            // Premium dark gradient overlay for readability
             LinearGradient(
                 colors: [
-                    Color.black.opacity(0.7),
-                    Color.black.opacity(0.4),
-                    Color.black.opacity(0.8)
+                    Color.black.opacity(0.3),
+                    Color.black.opacity(0.5),
+                    Color.black.opacity(0.85)
                 ],
                 startPoint: .top,
                 endPoint: .bottom
             )
             
             // Content
-            VStack(alignment: .leading, spacing: 8) {
-                HStack {
-                    // Leader badge
-                    if member.isLeader {
-                        Image(systemName: "crown.fill")
-                            .foregroundColor(Color(hex: "FFD700"))
-                            .font(.system(size: 16, weight: .bold))
-                    }
-                    
-                    Spacer()
-                    
-                    // Current user indicator
-                    if isCurrentUser {
-                        Text("YOU")
-                            .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(Color(hex: "FFD700"))
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(
-                                Capsule()
-                                    .fill(Color(hex: "FFD700").opacity(0.2))
-                            )
-                    }
-                }
-                .padding(.horizontal, 12)
-                .padding(.top, 12)
-                
+            VStack(alignment: .leading, spacing: 0) {
                 Spacer()
                 
-                // Username
-                VStack(alignment: .leading, spacing: 4) {
+                // Bottom info section
+                VStack(alignment: .leading, spacing: 6) {
+                    // Username - gold for leader, white for others
                     Text(member.username)
-                        .font(.system(size: 16, weight: .bold))
-                        .foregroundColor(.white)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(usernameColor(for: member))
                         .lineLimit(1)
                     
                     // Selected hero name
                     if let heroSlug = member.selectedHero,
                        let hero = HeroRegistry.shared.hero(slug: heroSlug) {
                         Text(hero.name)
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.8))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.7))
                             .lineLimit(1)
                     } else {
                         Text("No hero selected")
-                            .font(.system(size: 12, weight: .medium))
-                            .foregroundColor(Color.white.opacity(0.5))
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(Color.white.opacity(0.4))
                             .italic()
+                    }
+                    
+                    // Current user indicator (subtle)
+                    if isCurrentUser {
+                        Text("YOU")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(Color(hex: "FFD700"))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(
+                                Capsule()
+                                    .fill(Color(hex: "FFD700").opacity(0.2))
+                            )
+                            .padding(.top, 2)
                     }
                 }
                 .padding(.horizontal, 12)
-                .padding(.bottom, 12)
+                .padding(.bottom, 10)
             }
         }
     }
     
     private func emptyCard() -> some View {
         ZStack {
-            // Subtle gradient background
+            // Subtle gradient background (lower visual weight)
             LinearGradient(
                 colors: [
-                    Color(hex: "32324C").opacity(0.5),
-                    Color(hex: "1A1A2E").opacity(0.8)
+                    Color(hex: "2A2A4C").opacity(0.15),
+                    Color(hex: "1A1A2E").opacity(0.3)
                 ],
                 startPoint: .topLeading,
                 endPoint: .bottomTrailing
             )
             
-            // Dashed border effect
+            // Softer border
             RoundedRectangle(cornerRadius: 16)
-                .strokeBorder(
-                    style: StrokeStyle(lineWidth: 2, dash: [8, 6])
-                )
-                .foregroundColor(Color.white.opacity(0.2))
+                .stroke(Color.white.opacity(0.08), lineWidth: 1)
             
-            // Empty slot content
-            VStack(spacing: 12) {
-                Image(systemName: "person.badge.plus")
-                    .font(.system(size: 32, weight: .light))
-                    .foregroundColor(Color.white.opacity(0.3))
-                
-                Text("Empty Slot")
-                    .font(.system(size: 14, weight: .medium))
-                    .foregroundColor(Color.white.opacity(0.4))
-                
-                Text("Slot \(slotNumber)")
-                    .font(.system(size: 10, weight: .regular))
+            // Empty slot content (more subtle)
+            VStack(spacing: 8) {
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 28, weight: .light))
                     .foregroundColor(Color.white.opacity(0.2))
+                
+                Text("Empty")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Color.white.opacity(0.25))
             }
         }
     }
     
     private func heroBackground(slug: String) -> some View {
-        Image(uiImage: HeroRegistry.shared.heroImage(slug: slug))
-            .resizable()
-            .aspectRatio(contentMode: .fill)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        HeroImageView(slug: slug, contentMode: .fill)
     }
     
     private func defaultBackground() -> some View {
@@ -190,12 +177,47 @@ struct PartyMemberCard: View {
     
     private var borderColor: Color {
         if isCurrentUser {
-            return Color(hex: "FFD700") // Gold for current user
+            return Color(hex: "FFD700").opacity(0.6) // Gold for current user
         } else if member != nil {
-            return Color.white.opacity(0.3)
+            return Color.white.opacity(0.15)
         } else {
-            return Color.white.opacity(0.1)
+            return Color.clear
         }
+    }
+    
+    private var borderWidth: CGFloat {
+        if isCurrentUser {
+            return 2
+        } else if member != nil {
+            return 1
+        } else {
+            return 0
+        }
+    }
+    
+    private var shadowColor: Color {
+        if isCurrentUser {
+            return Color(hex: "FFD700").opacity(0.3)
+        } else if member != nil {
+            return Color.black.opacity(0.4)
+        } else {
+            return Color.clear
+        }
+    }
+    
+    private var shadowRadius: CGFloat {
+        if isCurrentUser {
+            return 12
+        } else if member != nil {
+            return 8
+        } else {
+            return 0
+        }
+    }
+    
+    // Username color: gold for leader, white for others
+    private func usernameColor(for member: PartyMember) -> Color {
+        member.isLeader ? Color(hex: "FFD700") : Color.white
     }
 }
 

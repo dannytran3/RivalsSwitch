@@ -105,10 +105,20 @@ class PartyManager: ObservableObject {
             }
             
             let userId = getCurrentUserId()
-            let leader = PartyMember(username: username, isLeader: true)
+            // Create leader with Jeff the Land Shark as default hero
+            let leader = PartyMember(
+                id: userId,
+                username: username,
+                selectedHero: "jeff",
+                isLeader: true
+            )
             let party = try await service.createParty(leaderId: userId, leaderUsername: username)
             
-            currentParty = party
+            // Update the party to include the default hero
+            var updatedParty = party
+            updatedParty.updateMemberHero(memberId: userId, hero: "jeff")
+            
+            currentParty = updatedParty
             isInParty = true
             persistParty()
             errorMessage = nil
@@ -294,6 +304,7 @@ class MockPartyService: PartyServiceProtocol {
         let leader = PartyMember(
             id: leaderId,
             username: leaderUsername,
+            selectedHero: "jeff", // Default hero (Jeff the Land Shark)
             isLeader: true
         )
         

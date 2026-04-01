@@ -14,20 +14,34 @@ struct PartyView: View {
     @State private var showLeaveAlert = false
     
     private let gridColumns = [
-        GridItem(.flexible(), spacing: 12),
-        GridItem(.flexible(), spacing: 12)
+        GridItem(.flexible(), spacing: 16),
+        GridItem(.flexible(), spacing: 16)
     ]
     
     var body: some View {
         ZStack {
-            // Background gradient
+            // Enhanced background with depth
             LinearGradient(
                 colors: [
                     Color(hex: "1A1A2E"),
-                    Color(hex: "25203E")
+                    Color(hex: "1F1F3A"),
+                    Color(hex: "25203E"),
+                    Color(hex: "1A1A2E")
                 ],
-                startPoint: .top,
-                endPoint: .bottom
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+            .ignoresSafeArea()
+            
+            // Subtle radial glow for depth
+            RadialGradient(
+                colors: [
+                    Color(hex: "FFD700").opacity(0.05),
+                    Color.clear
+                ],
+                center: .top,
+                startRadius: 100,
+                endRadius: 400
             )
             .ignoresSafeArea()
             
@@ -60,72 +74,116 @@ struct PartyView: View {
     // MARK: - Party Content
     
     private var partyContent: some View {
-        ScrollView {
-            VStack(spacing: 24) {
+        ScrollView(showsIndicators: true) {
+            VStack(spacing: 32) { // Increased spacing for better hierarchy
                 // Party header
                 partyHeader
                 
                 // Member grid (3x2)
                 memberGrid
+                    .padding(.top, 8)
                 
                 // Shared recommendations
                 if partyManager.currentRecommendation != nil {
                     sharedRecommendations
+                        .padding(.top, 8)
                 }
                 
                 // Action buttons
                 actionButtons
+                    .padding(.top, 16)
+                
+                // Bottom spacer to ensure last content is visible
+                Color.clear.frame(height: 1)
             }
-            .padding()
+            .padding(.horizontal, 20)
+            .padding(.vertical, 16)
+            .padding(.bottom, 20) // Extra bottom padding to prevent cutoff
         }
     }
     
     private var partyHeader: some View {
-        VStack(spacing: 8) {
-            HStack {
-                Image(systemName: "person.2.fill")
-                    .font(.title2)
-                    .foregroundColor(Color(hex: "FFD700"))
+        VStack(spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                // Party icon with glow
+                ZStack {
+                    Circle()
+                        .fill(Color(hex: "FFD700").opacity(0.15))
+                        .frame(width: 48, height: 48)
+                    
+                    Image(systemName: "person.2.fill")
+                        .font(.title3)
+                        .foregroundColor(Color(hex: "FFD700"))
+                }
                 
-                Text("Party")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Squad")
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                    
+                    if let party = partyManager.currentParty,
+                       let leader = party.leader {
+                        // Leader name in gold
+                        Text("Led by \(leader.username)")
+                            .font(.subheadline)
+                            .foregroundColor(Color(hex: "FFD700"))
+                    }
+                }
                 
                 Spacer()
                 
-                // Member count
-                Text("\(partyManager.currentParty?.members.count ?? 0)/6")
-                    .font(.headline)
-                    .foregroundColor(Color(hex: "FFD700"))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(
-                        Capsule()
-                            .fill(Color(hex: "FFD700").opacity(0.2))
-                    )
-            }
-            
-            if let party = partyManager.currentParty,
-               let leader = party.leader {
-                HStack {
-                    Text("Leader: \(leader.username)")
-                        .font(.subheadline)
-                        .foregroundColor(Color.white.opacity(0.7))
-                    
-                    Spacer()
+                // Member count badge - fixed to show "1/6" on one line
+                HStack(spacing: 0) {
+                    Text("\(partyManager.currentParty?.members.count ?? 0)/6")
+                        .font(.system(size: 20, weight: .bold))
+                        .foregroundColor(Color(hex: "FFD700"))
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(Color(hex: "FFD700").opacity(0.1))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 12)
+                                .stroke(Color(hex: "FFD700").opacity(0.3), lineWidth: 1)
+                        )
+                )
             }
         }
-        .padding()
+        .padding(16)
         .background(
             RoundedRectangle(cornerRadius: 16)
-                .fill(Color(hex: "32324C").opacity(0.6))
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            Color(hex: "2A2A4C").opacity(0.6),
+                            Color(hex: "1F1F3A").opacity(0.4)
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16)
+                        .stroke(
+                            LinearGradient(
+                                colors: [
+                                    Color(hex: "FFD700").opacity(0.2),
+                                    Color.clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 1
+                        )
+                )
         )
+        .shadow(color: Color.black.opacity(0.3), radius: 10, x: 0, y: 4)
     }
     
     private var memberGrid: some View {
-        LazyVGrid(columns: gridColumns, spacing: 12) {
+        LazyVGrid(columns: gridColumns, spacing: 16) {
             ForEach(0..<6, id: \.self) { index in
                 let member = partyManager.currentParty?.members[safe: index]
                 let isCurrentUser = member?.id == getCurrentUserId()
@@ -199,9 +257,7 @@ struct PartyView: View {
     private func recommendationCard(_ rec: HeroRecommendation) -> some View {
         HStack(spacing: 12) {
             // Hero image
-            Image(uiImage: HeroRegistry.shared.heroImage(slug: rec.heroSlug))
-                .resizable()
-                .aspectRatio(contentMode: .fill)
+            HeroImageView(slug: rec.heroSlug, contentMode: .fill)
                 .frame(width: 50, height: 50)
                 .clipShape(RoundedRectangle(cornerRadius: 8))
             
@@ -241,24 +297,23 @@ struct PartyView: View {
     }
     
     private var actionButtons: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 14) {
             // Invite button (only for leader)
             if partyManager.isCurrentUserLeader(),
                !(partyManager.currentParty?.isFull ?? false) {
                 Button(action: {
                     showInviteSheet = true
                 }) {
-                    HStack {
+                    HStack(spacing: 10) {
                         Image(systemName: "person.badge.plus")
-                            .font(.headline)
+                            .font(.system(size: 16, weight: .semibold))
                         Text("Invite Player")
-                            .font(.headline)
-                            .fontWeight(.semibold)
+                            .font(.system(size: 16, weight: .semibold))
                     }
                     .frame(maxWidth: .infinity)
-                    .padding()
+                    .padding(.vertical, 16)
                     .background(
-                        RoundedRectangle(cornerRadius: 12)
+                        RoundedRectangle(cornerRadius: 14)
                             .fill(
                                 LinearGradient(
                                     colors: [
@@ -271,6 +326,7 @@ struct PartyView: View {
                             )
                     )
                     .foregroundColor(Color(hex: "1A1A2E"))
+                    .shadow(color: Color(hex: "FFD700").opacity(0.3), radius: 10, x: 0, y: 4)
                 }
             }
             
@@ -278,20 +334,23 @@ struct PartyView: View {
             Button(action: {
                 showLeaveAlert = true
             }) {
-                HStack {
+                HStack(spacing: 10) {
                     Image(systemName: "rectangle.portrait.and.arrow.right")
-                        .font(.headline)
-                    Text("Leave Party")
-                        .font(.headline)
-                        .fontWeight(.semibold)
+                        .font(.system(size: 16, weight: .semibold))
+                    Text("Leave Squad")
+                        .font(.system(size: 16, weight: .semibold))
                 }
                 .frame(maxWidth: .infinity)
-                .padding()
+                .padding(.vertical, 16)
                 .background(
-                    RoundedRectangle(cornerRadius: 12)
-                        .stroke(Color.red.opacity(0.6), lineWidth: 2)
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(Color.red.opacity(0.5), lineWidth: 1.5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 14)
+                                .fill(Color.red.opacity(0.05))
+                        )
                 )
-                .foregroundColor(.red)
+                .foregroundColor(.red.opacity(0.9))
             }
         }
     }

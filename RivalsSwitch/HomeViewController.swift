@@ -363,8 +363,13 @@ class HomeViewController: UIViewController {
     }
     
     @objc private func startPartyTapped() {
-        // Temporary shortcut until a full party flow is added
-        startNewMatchTapped()
+        // Navigate to Party tab (index 5)
+        guard let tabBarController = self.tabBarController else {
+            return
+        }
+        
+        // Switch to Party tab - user will manually create party from there
+        tabBarController.selectedIndex = 5
     }
 }
 

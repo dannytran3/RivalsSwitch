@@ -8,7 +8,7 @@
 import UIKit
 import SwiftUI
 
-class PartyViewController: UIViewController {
+class PartyViewController2: UIViewController {
     
     override func viewDidLoad() {
         super.viewDidLoad()

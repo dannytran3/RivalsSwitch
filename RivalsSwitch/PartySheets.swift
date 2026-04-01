@@ -65,39 +65,24 @@ struct InvitePlayerSheet: View {
                     
                     // Buttons
                     VStack(spacing: 12) {
-                        // Send invite button
+                        // Send invite button - Coming Soon
                         Button(action: {
                             sendInvite()
                         }) {
                             HStack {
-                                if isInviting {
-                                    ProgressView()
-                                        .progressViewStyle(CircularProgressViewStyle(tint: Color(hex: "1A1A2E")))
-                                } else {
-                                    Image(systemName: "paperplane.fill")
-                                    Text("Send Invite")
-                                        .fontWeight(.semibold)
-                                }
+                                Image(systemName: "clock.badge.exclamationmark")
+                                Text("Coming Soon")
+                                    .fontWeight(.semibold)
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
                             .background(
                                 RoundedRectangle(cornerRadius: 12)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color(hex: "FFD700"),
-                                                Color(hex: "FFA500")
-                                            ],
-                                            startPoint: .leading,
-                                            endPoint: .trailing
-                                        )
-                                    )
+                                    .fill(Color.gray.opacity(0.5))
                             )
-                            .foregroundColor(Color(hex: "1A1A2E"))
+                            .foregroundColor(Color.white.opacity(0.7))
                         }
-                        .disabled(username.isEmpty || isInviting)
-                        .opacity(username.isEmpty || isInviting ? 0.5 : 1.0)
+                        .disabled(true)
                         
                         // Cancel button
                         Button(action: {
@@ -122,22 +107,11 @@ struct InvitePlayerSheet: View {
     }
     
     private func sendInvite() {
-        guard !username.isEmpty else { return }
+        // Show "Coming Soon" message instead of actually sending invite
+        isPresented = false
         
-        isInviting = true
-        
-        Task {
-            await partyManager.sendInvite(toUsername: username)
-            
-            await MainActor.run {
-                isInviting = false
-                
-                // Close sheet on success
-                if partyManager.errorMessage == nil {
-                    isPresented = false
-                }
-            }
-        }
+        // You could add a toast/alert here if desired
+        // For now, just close the sheet
     }
 }
 
@@ -289,39 +263,47 @@ struct HeroSelectCard: View {
     let action: () -> Void
     
     var body: some View {
-        Button(action: action) {
-            VStack(spacing: 8) {
-                // Hero image
-                Image(uiImage: HeroRegistry.shared.heroImage(slug: hero.slug))
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(height: 120)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                
-                // Hero name
-                Text(hero.name)
+        VStack(spacing: 10) {
+            HeroImageView(slug: hero.slug, contentMode: .fill)
+                .frame(height: 120)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .allowsHitTesting(false)
+            
+            Text(hero.name)
+                .font(.caption)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .lineLimit(1)
+            
+            Text(hero.role.rawValue.capitalized)
+                .font(.caption2)
+                .foregroundColor(roleColor(hero.role))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(roleColor(hero.role).opacity(0.2))
+                )
+            
+            Button(action: action) {
+                Text("Select")
                     .font(.caption)
                     .fontWeight(.semibold)
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                
-                // Role badge
-                Text(hero.role.rawValue.capitalized)
-                    .font(.caption2)
-                    .foregroundColor(roleColor(hero.role))
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 4)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
                     .background(
-                        Capsule()
-                            .fill(roleColor(hero.role).opacity(0.2))
+                        RoundedRectangle(cornerRadius: 10)
+                            .fill(Color(hex: "FFD700"))
                     )
+                    .foregroundColor(Color(hex: "1A1A2E"))
             }
-            .padding(8)
-            .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color(hex: "32324C").opacity(0.6))
-            )
+            .buttonStyle(.plain)
         }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(Color(hex: "32324C").opacity(0.6))
+        )
     }
     
     private func roleColor(_ role: HeroData.HeroRole) -> Color {
