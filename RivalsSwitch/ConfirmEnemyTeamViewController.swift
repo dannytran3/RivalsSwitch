@@ -183,6 +183,7 @@ class ConfirmEnemyTeamViewController: UIViewController {
             kills: MatchStore.shared.currentKills,
             deaths: MatchStore.shared.currentDeaths,
             assists: MatchStore.shared.currentAssists,
+            friendlyTeam: MatchStore.shared.friendlyTeam,
             enemyTeam: enemyTeam
         )
 

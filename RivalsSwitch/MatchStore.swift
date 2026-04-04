@@ -21,6 +21,14 @@ class MatchStore {
     var enemy4: String = ""
     var enemy5: String = ""
     var enemy6: String = ""
+    
+    // Friendly team heroes detected from the scoreboard
+    var team1: String = ""
+    var team2: String = ""
+    var team3: String = ""
+    var team4: String = ""
+    var team5: String = ""
+    var team6: String = ""
 
     // Top recommendations returned from the recommendation engine
     var recommendedHero1: String = ""
@@ -57,6 +65,17 @@ class MatchStore {
         recommendedReason2 = ""
         recommendedHero3 = ""
         recommendedReason3 = ""
+        
+        team1 = ""
+        team2 = ""
+        team3 = ""
+        team4 = ""
+        team5 = ""
+        team6 = ""
+    }
+    
+    var friendlyTeam: [String] {
+        [team1, team2, team3, team4, team5, team6].filter { !$0.isEmpty }
     }
 
     // Saves the current match summary into local storage

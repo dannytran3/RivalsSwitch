@@ -38,10 +38,9 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     private var gradientLayer: CAGradientLayer?
     
     // Known heroes we want to detect from OCR text
-    private let knownHeroes = [
-        "spider-man", "iron man", "hulk", "loki",
-        "punisher", "magneto", "storm", "thor"
-    ]
+    private var knownHeroes: [String] {
+        HeroRegistry.shared.allHeroes.map { $0.name.lowercased() }
+    }
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -287,6 +286,9 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         }
         
         parseHero(from: observations)
+        parseEnemyTeam(from: observations)
+        parseFriendlyTeam(from: observations)
+
         
         print("SAVED HERO:", MatchStore.shared.currentHero)
         print("SAVED USERNAME:", MatchStore.shared.currentUsername)
@@ -473,34 +475,73 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     
     private func parseHero(from observations: [VNRecognizedTextObservation]) {
         var bestHero = ""
-        var bestDistance = Int.max
-
+        
         for observation in observations {
             guard let candidate = observation.topCandidates(1).first else { continue }
-
-            let text = normalizedOCRText(candidate.string)
-
+            
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
             let rect = observation.boundingBox
-
+            
             // Hero label is usually in the lower-left panel of the screenshot
             if rect.midY < 0.28 && rect.minX < 0.30 {
-                for hero in knownHeroes {
-                    let distance = levenshteinDistance(text, normalizedOCRText(hero))
-
-                    if distance < bestDistance {
-                        bestDistance = distance
-                        bestHero = hero.capitalized
-                    }
+                if let matchedHero = bestMatchingHeroName(from: text) {
+                    bestHero = matchedHero
+                    break
                 }
             }
         }
-
-        // Only accept close enough hero matches
-        if bestDistance <= 3 {
-            MatchStore.shared.currentHero = bestHero
-        } else {
-            MatchStore.shared.currentHero = ""
+        
+        MatchStore.shared.currentHero = bestHero
+    }
+    
+    private func parseEnemyTeam(from observations: [VNRecognizedTextObservation]) {
+        var detectedEnemies: [String] = []
+        
+        for observation in observations {
+            guard let candidate = observation.topCandidates(1).first else { continue }
+            
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rect = observation.boundingBox
+            
+            // Right side of scoreboard only
+            if rect.minX < 0.56 || rect.midY > 0.86 || rect.midY < 0.28 {
+                continue
+            }
+            
+            if let heroName = bestMatchingHeroName(from: text) {
+                if !detectedEnemies.contains(heroName) {
+                    detectedEnemies.append(heroName)
+                }
+            }
         }
+        
+        saveEnemyTeam(detectedEnemies)
+        print("DETECTED ENEMY TEAM:", detectedEnemies)
+    }
+    
+    private func parseFriendlyTeam(from observations: [VNRecognizedTextObservation]) {
+        var detectedTeam: [String] = []
+        
+        for observation in observations {
+            guard let candidate = observation.topCandidates(1).first else { continue }
+            
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rect = observation.boundingBox
+            
+            // Left side of scoreboard only
+            if rect.minX > 0.56 || rect.midY > 0.86 || rect.midY < 0.28 {
+                continue
+            }
+            
+            if let heroName = bestMatchingHeroName(from: text) {
+                if !detectedTeam.contains(heroName) {
+                    detectedTeam.append(heroName)
+                }
+            }
+        }
+        
+        saveFriendlyTeam(detectedTeam)
+        print("DETECTED FRIENDLY TEAM:", detectedTeam)
     }
     
     private func texts(in region: CGRect, from observations: [VNRecognizedTextObservation]) -> [String] {
@@ -657,6 +698,56 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         text.lowercased()
             .components(separatedBy: CharacterSet.alphanumerics.inverted)
             .joined()
+    }
+    
+    private func bestMatchingHeroName(from rawText: String) -> String? {
+        let normalizedText = normalizedOCRText(rawText)
+        guard !normalizedText.isEmpty else { return nil }
+        
+        var bestHeroName: String?
+        var bestDistance = Int.max
+        
+        for hero in HeroRegistry.shared.allHeroes {
+            let heroName = hero.name
+            let heroNormalized = normalizedOCRText(heroName)
+            
+            // Strong match if OCR text contains the hero name
+            if normalizedText.contains(heroNormalized) || heroNormalized.contains(normalizedText) {
+                return heroName
+            }
+            
+            // Otherwise fall back to edit distance
+            let distance = levenshteinDistance(normalizedText, heroNormalized)
+            if distance < bestDistance {
+                bestDistance = distance
+                bestHeroName = heroName
+            }
+        }
+        
+        // Allow slightly looser OCR matching for longer strings like "captainamericahard"
+        if bestDistance <= 5 {
+            return bestHeroName
+        }
+        
+        return nil
+    }
+
+    private func saveFriendlyTeam(_ heroes: [String]) {
+        MatchStore.shared.team1 = heroes.count > 0 ? heroes[0] : ""
+        MatchStore.shared.team2 = heroes.count > 1 ? heroes[1] : ""
+        MatchStore.shared.team3 = heroes.count > 2 ? heroes[2] : ""
+        MatchStore.shared.team4 = heroes.count > 3 ? heroes[3] : ""
+        MatchStore.shared.team5 = heroes.count > 4 ? heroes[4] : ""
+        MatchStore.shared.team6 = heroes.count > 5 ? heroes[5] : ""
+    }
+
+    private func saveEnemyTeam(_ heroes: [String]) {
+        MatchStore.shared.enemy1 = heroes.count > 0 ? heroes[0] : ""
+        MatchStore.shared.enemy2 = heroes.count > 1 ? heroes[1] : ""
+        MatchStore.shared.enemy3 = heroes.count > 2 ? heroes[2] : ""
+        MatchStore.shared.enemy4 = heroes.count > 3 ? heroes[3] : ""
+        MatchStore.shared.enemy5 = heroes.count > 4 ? heroes[4] : ""
+        MatchStore.shared.enemy6 = heroes.count > 5 ? heroes[5] : ""
     }
     
     private func showAlert(title: String, message: String) {
