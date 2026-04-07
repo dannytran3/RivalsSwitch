@@ -39,7 +39,9 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     
     // Known heroes we want to detect from OCR text
     private var knownHeroes: [String] {
-        HeroRegistry.shared.allHeroes.map { $0.name.lowercased() }
+        let heroNames = HeroRegistry.shared.allHeroes.map { $0.name.lowercased() }
+        let aliases = Array(HeroRegistry.shared.ocrHeroAliases().keys)
+        return heroNames + aliases
     }
 
     override func viewDidLoad() {
@@ -703,33 +705,45 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     private func bestMatchingHeroName(from rawText: String) -> String? {
         let normalizedText = normalizedOCRText(rawText)
         guard !normalizedText.isEmpty else { return nil }
-        
-        var bestHeroName: String?
-        var bestDistance = Int.max
-        
+
+        var candidates: [String: String] = [:]
+
         for hero in HeroRegistry.shared.allHeroes {
-            let heroName = hero.name
-            let heroNormalized = normalizedOCRText(heroName)
-            
-            // Strong match if OCR text contains the hero name
-            if normalizedText.contains(heroNormalized) || heroNormalized.contains(normalizedText) {
+            candidates[normalizedOCRText(hero.name)] = hero.name
+        }
+
+        for (alias, heroName) in HeroRegistry.shared.ocrHeroAliases() {
+            candidates[normalizedOCRText(alias)] = heroName
+        }
+
+        if let exact = candidates[normalizedText] {
+            return exact
+        }
+
+        for (candidate, heroName) in candidates {
+            if normalizedText.contains(candidate) || candidate.contains(normalizedText) {
                 return heroName
             }
-            
-            // Otherwise fall back to edit distance
-            let distance = levenshteinDistance(normalizedText, heroNormalized)
+        }
+
+        var bestHeroName: String?
+        var bestDistance = Int.max
+
+        for (candidate, heroName) in candidates {
+            let distance = levenshteinDistance(normalizedText, candidate)
             if distance < bestDistance {
                 bestDistance = distance
                 bestHeroName = heroName
             }
         }
-        
-        // Allow slightly looser OCR matching for longer strings like "captainamericahard"
-        if bestDistance <= 5 {
-            return bestHeroName
+
+        if normalizedText.count <= 4 {
+            return bestDistance <= 1 ? bestHeroName : nil
+        } else if normalizedText.count <= 8 {
+            return bestDistance <= 2 ? bestHeroName : nil
+        } else {
+            return bestDistance <= 4 ? bestHeroName : nil
         }
-        
-        return nil
     }
 
     private func saveFriendlyTeam(_ heroes: [String]) {

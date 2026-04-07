@@ -162,4 +162,70 @@ class HeroRegistry {
     func randomHero() -> HeroData {
         allHeroes.randomElement() ?? allHeroes[0]
     }
+    
+    func ocrHeroAliases() -> [String: String] {
+        [
+            "angela": "Angela",
+            "blade": "Blade",
+            "daredevil": "Daredevil",
+            "deadpool": "Deadpool",
+            "elsa bloodstone": "Elsa Bloodstone",
+            "elsa": "Elsa Bloodstone",
+            "emma frost": "Emma Frost",
+            "gambit": "Gambit",
+            "human torch": "Human Torch",
+            "invisible woman": "Invisible Woman",
+            "mister fantastic": "Mister Fantastic",
+            "mr fantastic": "Mister Fantastic",
+            "mr. fantastic": "Mister Fantastic",
+            "moon knight": "Moon Knight",
+            "phoenix": "Phoenix",
+            "rogue": "Rogue",
+            "the thing": "The Thing",
+            "thing": "The Thing",
+            "ultron": "Ultron",
+            "white fox": "White Fox",
+            "wolverine": "Wolverine",
+
+            "spider man": "Spider-Man",
+            "spiderman": "Spider-Man",
+            "spider-man": "Spider-Man",
+
+            "iron man": "Iron Man",
+            "ironman": "Iron Man",
+
+            "iron fist": "Iron Fist",
+            "ironfist": "Iron Fist",
+
+            "black widow": "Black Widow",
+            "blackwidow": "Black Widow",
+
+            "black panther": "Black Panther",
+            "blackpanther": "Black Panther",
+
+            "doctor strange": "Doctor Strange",
+            "dr strange": "Doctor Strange",
+            "dr. strange": "Doctor Strange",
+
+            "captain america": "Captain America",
+            "capt america": "Captain America",
+
+            "star lord": "Star-Lord",
+            "starlord": "Star-Lord",
+            "star-lord": "Star-Lord",
+
+            "winter soldier": "Winter Soldier",
+            "wintersoldier": "Winter Soldier",
+
+            "cloak and dagger": "Cloak & Dagger",
+            "cloak dagger": "Cloak & Dagger",
+            "cloak & dagger": "Cloak & Dagger",
+
+            "rocket raccoon": "Rocket Raccoon",
+            "rocket": "Rocket Raccoon",
+
+            "jeff the land shark": "Jeff the Land Shark",
+            "jeff": "Jeff the Land Shark"
+        ]
+    }
 }
