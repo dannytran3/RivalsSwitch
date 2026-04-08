@@ -18,33 +18,28 @@ class MainTabBarController: UITabBarController {
     // Creates each tab and assigns icons/navigation controllers
     private func setupTabBar() {
         
-        // Create all view controllers
+        // Create all view controllers (Party has its own tab after removing the old “More” hub)
         let homeVC = HomeViewController()
+        let partyVC = PartyViewController()
         let matchVC = CameraScanViewController()
         let historyVC = HistoryViewController()
         let profileVC = ProfileViewController()
-        let settingsVC = SettingsViewController()
-        let partyVC = PartyViewController()
         
         // Wrap each screen inside a navigation controller
         // This allows pushing new screens inside each tab
         let homeNav = UINavigationController(rootViewController: homeVC)
+        let partyNav = UINavigationController(rootViewController: partyVC)
         let matchNav = UINavigationController(rootViewController: matchVC)
         let historyNav = UINavigationController(rootViewController: historyVC)
         let profileNav = UINavigationController(rootViewController: profileVC)
-        let settingsNav = UINavigationController(rootViewController: settingsVC)
-        let partyNav = UINavigationController(rootViewController: partyVC)
         
-        // Change tab icons and labels using SF Symbols
         homeNav.tabBarItem = UITabBarItem(title: "Home", image: UIImage(systemName: "house.fill"), tag: 0)
-        matchNav.tabBarItem = UITabBarItem(title: "Match", image: UIImage(systemName: "camera.fill"), tag: 1)
-        historyNav.tabBarItem = UITabBarItem(title: "History", image: UIImage(systemName: "clock.fill"), tag: 2)
-        profileNav.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.fill"), tag: 3)
-        settingsNav.tabBarItem = UITabBarItem(title: "Settings", image: UIImage(systemName: "gearshape.fill"), tag: 4)
-        partyNav.tabBarItem = UITabBarItem(title: "Party", image: UIImage(systemName: "person.2.fill"), tag: 5)
+        partyNav.tabBarItem = UITabBarItem(title: "Party", image: UIImage(systemName: "person.2.fill"), tag: 1)
+        matchNav.tabBarItem = UITabBarItem(title: "Match", image: UIImage(systemName: "camera.fill"), tag: 2)
+        historyNav.tabBarItem = UITabBarItem(title: "History", image: UIImage(systemName: "clock.fill"), tag: 3)
+        profileNav.tabBarItem = UITabBarItem(title: "Profile", image: UIImage(systemName: "person.fill"), tag: 4)
         
-        //Attach all tabs to the tab bar controller
-        viewControllers = [homeNav, matchNav, historyNav, profileNav, settingsNav, partyNav]
+        viewControllers = [homeNav, partyNav, matchNav, historyNav, profileNav]
         
         // styling across the tab bar
         tabBar.applyAppStyle()

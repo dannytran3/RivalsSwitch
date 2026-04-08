@@ -12,6 +12,10 @@ class LaunchViewController: UIViewController {
     
     private let iconImageView = UIImageView()
     private var gradientLayer: CAGradientLayer?
+
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var shouldAutorotate: Bool { false }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
     
     override func viewDidLoad() {
         super.viewDidLoad()

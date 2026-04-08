@@ -2,6 +2,14 @@ import Foundation
 
 class RecommendationEngine {
     
+    private struct ScoredPick {
+        let hero: String
+        let role: String
+        let score: Int
+        let reasons: [String]
+        let counterHits: Int
+    }
+    
     // Heroes that are strong into certain enemy heroes
     // Heroes that are strong into certain enemy heroes
     static let counterMap: [String: [String]] = [
@@ -125,38 +133,50 @@ class RecommendationEngine {
         
         var parts: [String] = []
         
-        // Format hero name in caps
-        let heroDisplay = heroName.uppercased()
-        
         if !matchedCounters.isEmpty {
-            let enemyList = matchedCounters.map { $0 }.joined(separator: ", ")
-            parts.append("\(heroDisplay) is a strong pick because it counters \(enemyList)")
+            let enemyList = matchedCounters.joined(separator: ", ")
+            parts.append("\(heroName) is a strong pick here because they counter \(enemyList)")
         }
         
         if struggling {
             switch candidateRole {
             case .vanguard:
-                parts.append("it gives your team a safer FRONTLINE under pressure")
+                parts.append("they give your team a safer frontline when you are under pressure")
             case .strategist:
-                parts.append("it provides more SUPPORT and stability for your team")
+                parts.append("they provide more support and stability for your team")
             case .duelist:
-                parts.append("it offers more consistent DAMAGE in this matchup")
+                parts.append("they offer more consistent damage in this matchup")
             }
         }
         
         if givesUtility && matchedCounters.isEmpty {
-            parts.append("it adds better TEAM UTILITY")
+            parts.append("they add strong team utility")
         }
         
         if helpsEscapeBadMatchup && matchedCounters.isEmpty {
-            parts.append("it helps you avoid a BAD MATCHUP")
+            parts.append("they help you steer away from a rough matchup on your current hero")
         }
         
         if parts.isEmpty {
-            parts.append("\(heroDisplay) fits better into the current match")
+            parts.append("\(heroName) fits this lobby better than staying on your current pick")
         }
         
-        return parts.joined(separator: ". ") + "."
+        return parts.joined(separator: " ") + "."
+    }
+    
+    /// Shorter, non-redundant copy for #2 / #3 picks (primary keeps full `buildReason` text).
+    private static func reasonForSecondAlternatePick(candidate: String, primary: String) -> String {
+        if primary == "Stay Current Hero" {
+            return "\(candidate) is the top swap if you still want off your current hero — use this when you're hard countered or need a fresh kit."
+        }
+        return "If you can't play \(primary) — taken, banned, or just not your hero — \(candidate) is another strong option for this lobby."
+    }
+    
+    private static func reasonForThirdAlternatePick(candidate: String, primary: String, secondPick: String) -> String {
+        if primary == "Stay Current Hero" {
+            return "Still deciding? \(candidate) is one more flex worth trying if the picks above don't fit how you want to play."
+        }
+        return "If \(primary) and \(secondPick) are both off the table, \(candidate) is still a solid third choice — different kit, same goal of improving your matchup."
     }
     
     
@@ -179,20 +199,20 @@ class RecommendationEngine {
 
         let struggling = deaths >= 5 || (deaths - kills >= 3)
         let doingWell = kills >= 10 && deaths <= 5 && assists >= 5
+        let style = AppRecommendationStyle.stored
         
-        var scoredResults: [(hero: String, role: String, score: Int, reasons: [String])] = []
+        var scoredResults: [ScoredPick] = []
 
-        // If player is doing well, keep "stay" as the best option
         if doingWell {
-            scoredResults.append((
+            scoredResults.append(ScoredPick(
                 hero: "Stay Current Hero",
                 role: "None",
                 score: 100,
-                reasons: ["your performance is strong and there is no urgent need to switch"]
+                reasons: ["your performance is strong and there is no urgent need to switch"],
+                counterHits: 0
             ))
         }
 
-        // Check whether current hero is in a bad matchup
         let currentHeroWeakAgainst = weakAgainstMap[normalizedCurrentHero] ?? []
         let currentHeroBadMatchups = enemies.filter { currentHeroWeakAgainst.contains($0) }
 
@@ -241,9 +261,7 @@ class RecommendationEngine {
 
             if struggling {
                 switch candidate.role {
-                case .vanguard:
-                    score += 1
-                case .strategist:
+                case .vanguard, .strategist:
                     score += 1
                 case .duelist:
                     break
@@ -259,11 +277,12 @@ class RecommendationEngine {
                 candidateRole: candidate.role
             )
 
-            scoredResults.append((
+            scoredResults.append(ScoredPick(
                 hero: candidateName,
                 role: "\(candidate.role)",
                 score: score,
-                reasons: [finalReason]
+                reasons: [finalReason],
+                counterHits: matchedCounters.count
             ))
         }
 
@@ -274,44 +293,81 @@ class RecommendationEngine {
             return left.score > right.score
         }
 
-        // Prevent top 3 from always being the same exact role when possible
-        var finalResults: [(hero: String, score: Int, reasons: [String], role: String)] = []
-        var usedRoles: Set<String> = []
-
-        for result in scoredResults {
-            if finalResults.count < 3 {
-                if !usedRoles.contains(result.role) || finalResults.count == 2 {
-                    finalResults.append((
-                        hero: result.hero,
-                        score: result.score,
-                        reasons: result.reasons,
-                        role: result.role
-                    ))
-                    usedRoles.insert(result.role)
-                }
+        var pool = scoredResults
+        if style == .critical {
+            let filtered = pool.filter { pick in
+                if pick.hero == "Stay Current Hero" { return true }
+                let strong = pick.counterHits > 0 || pick.score >= (struggling ? 5 : 9)
+                let escape = pick.score >= 6 && struggling
+                return strong || escape
+            }
+            let nonStay = filtered.filter { $0.hero != "Stay Current Hero" }
+            if nonStay.isEmpty {
+                pool = scoredResults
             } else {
-                break
+                pool = filtered
             }
         }
 
-        // Fallback in case role filtering skipped too many
-        if finalResults.count < 3 {
-            for result in scoredResults {
-                if finalResults.count >= 3 { break }
-                if !finalResults.contains(where: { $0.hero == result.hero }) {
-                    finalResults.append((
-                        hero: result.hero,
-                        score: result.score,
-                        reasons: result.reasons,
-                        role: result.role
-                    ))
+        var finalResults: [(hero: String, score: Int, reasons: [String], role: String)] = []
+
+        if style == .maxPicks {
+            for pick in pool where finalResults.count < 3 {
+                finalResults.append((pick.hero, pick.score, pick.reasons, pick.role))
+            }
+        } else {
+            var usedRoles: Set<String> = []
+            for pick in pool {
+                guard finalResults.count < 3 else { break }
+                if !usedRoles.contains(pick.role) || finalResults.count == 2 {
+                    finalResults.append((pick.hero, pick.score, pick.reasons, pick.role))
+                    usedRoles.insert(pick.role)
+                }
+            }
+            if finalResults.count < 3 {
+                for pick in pool {
+                    guard finalResults.count < 3 else { break }
+                    if !finalResults.contains(where: { $0.hero == pick.hero }) {
+                        finalResults.append((pick.hero, pick.score, pick.reasons, pick.role))
+                    }
                 }
             }
         }
 
-        return finalResults.prefix(3).map { result in
-            let reasonText = result.reasons.joined(separator: ". ")
-            return (result.hero, reasonText.capitalized + ".")
+        let topThree = Array(finalResults.prefix(3))
+        return topThree.enumerated().map { index, result in
+            let primaryName = topThree[0].hero
+            let secondName = topThree.count > 1 ? topThree[1].hero : ""
+            
+            let reasonText: String
+            switch index {
+            case 0:
+                let raw = result.reasons.joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+                reasonText = raw.hasSuffix(".") ? raw : raw + "."
+            case 1:
+                reasonText = reasonForSecondAlternatePick(candidate: result.hero, primary: primaryName)
+            default:
+                reasonText = reasonForThirdAlternatePick(
+                    candidate: result.hero,
+                    primary: primaryName,
+                    secondPick: secondName
+                )
+            }
+            
+            let secondPickName = topThree.count > 1 ? topThree[1].hero : nil
+            let voiced = AppPreferenceStore.applyMessagingTone(
+                to: reasonText,
+                slotIndex: index,
+                recommendedHero: result.hero,
+                primaryHero: primaryName,
+                secondHero: secondPickName,
+                kills: kills,
+                deaths: deaths,
+                assists: assists,
+                struggling: struggling,
+                doingWell: doingWell
+            )
+            return (result.hero, voiced)
         }
     }
 }

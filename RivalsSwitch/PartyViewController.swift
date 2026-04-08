@@ -15,6 +15,11 @@ class PartyViewController: UIViewController {
         setupSwiftUIView()
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        navigationItem.title = "Party"
+    }
+    
     private func setupSwiftUIView() {
         // Create SwiftUI view
         let partyView = PartyView()

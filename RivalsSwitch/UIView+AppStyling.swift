@@ -9,24 +9,54 @@ import UIKit
 import ObjectiveC
 
 extension UIButton {
+    /// Clears configuration, blur backgrounds, and gradient/outline layers so layer-based CTA styles compose cleanly.
+    fileprivate func resetForLayerCTAStyling() {
+        if #available(iOS 15.0, *) {
+            configuration = nil
+        }
+        subviews.filter { $0 is UIVisualEffectView }.forEach { $0.removeFromSuperview() }
+        layer.sublayers?.filter { $0 is CAGradientLayer || $0.name == "gradientOutlineLayer" }.forEach { $0.removeFromSuperlayer() }
+        objc_setAssociatedObject(self, "gradientLayer", nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        objc_setAssociatedObject(self, "gradientOutlineLayer", nil, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+    
     // Applies primary button styling (gold background, white text)
     func applyPrimaryStyle() {
+        resetForLayerCTAStyling()
         backgroundColor = .appPrimaryAccent
         setTitleColor(.appPrimaryText, for: .normal)
         titleLabel?.font = .appButtonText
-        layer.cornerRadius = 12
-        contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+        layer.cornerRadius = 16
+        layer.masksToBounds = true
+        layer.borderWidth = 0
+        contentEdgeInsets = UIEdgeInsets(top: 16, left: 24, bottom: 16, right: 24)
     }
     
-    // Applies secondary button styling (transparent with gold border)
+    /// Secondary CTA: same footprint as the gradient primary (filled muted surface, subtle border) — pairs with `applyGradientStyle()`.
     func applySecondaryStyle() {
-        backgroundColor = .clear
-        setTitleColor(.appPrimaryAccent, for: .normal)
+        resetForLayerCTAStyling()
+        backgroundColor = UIColor.white.withAlphaComponent(0.12)
+        setTitleColor(.appPrimaryText, for: .normal)
         titleLabel?.font = .appButtonTextMedium
-        layer.cornerRadius = 12
-        layer.borderWidth = 2
-        layer.borderColor = UIColor.appPrimaryAccent.cgColor
-        contentEdgeInsets = UIEdgeInsets(top: 14, left: 16, bottom: 14, right: 16)
+        layer.cornerRadius = 16
+        layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.appBorderColor.cgColor
+        contentEdgeInsets = UIEdgeInsets(top: 16, left: 24, bottom: 16, right: 24)
+    }
+    
+    /// Destructive secondary CTA (e.g. logout): same shape as `applySecondaryStyle()`, error tint.
+    func applyDestructiveSecondaryStyle() {
+        resetForLayerCTAStyling()
+        backgroundColor = UIColor.appErrorColor.withAlphaComponent(0.12)
+        setTitleColor(.appErrorColor, for: .normal)
+        titleLabel?.font = .appButtonTextMedium
+        tintColor = .appErrorColor
+        layer.cornerRadius = 16
+        layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.appErrorColor.withAlphaComponent(0.35).cgColor
+        contentEdgeInsets = UIEdgeInsets(top: 16, left: 24, bottom: 16, right: 24)
     }
     
     // Applies tertiary button styling (text only)
@@ -39,8 +69,7 @@ extension UIButton {
     
     // Applies an outlined button with a horizontal gradient stroke
     func applyGradientOutlineStyle() {
-        // Clear any existing gradient layers
-        layer.sublayers?.filter { $0.name == "gradientOutlineLayer" }.forEach { $0.removeFromSuperlayer() }
+        resetForLayerCTAStyling()
 
         backgroundColor = .clear
         setTitleColor(.appPrimaryText, for: .normal)
@@ -73,8 +102,8 @@ extension UIButton {
     
     // Applies gradient button style (orange to yellow gradient)
     func applyGradientStyle() {
-        // Remove any existing gradient layers
-        layer.sublayers?.filter { $0 is CAGradientLayer }.forEach { $0.removeFromSuperlayer() }
+        resetForLayerCTAStyling()
+        backgroundColor = .clear
         
         let gradientLayer = CAGradientLayer()
         gradientLayer.colors = [
@@ -87,16 +116,28 @@ extension UIButton {
         gradientLayer.frame = bounds
         layer.insertSublayer(gradientLayer, at: 0)
         
-        // Store gradient layer for updates
         objc_setAssociatedObject(self, "gradientLayer", gradientLayer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         
         setTitleColor(.appPrimaryText, for: .normal)
         titleLabel?.font = .appButtonText
         layer.cornerRadius = 16
+        layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.black.withAlphaComponent(0.22).cgColor
         contentEdgeInsets = UIEdgeInsets(top: 16, left: 24, bottom: 16, right: 24)
-        
-        // Store gradient layer for later updates
-        objc_setAssociatedObject(self, "gradientLayer", gradientLayer, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+    }
+    
+    /// Solid app gold fill + rounded rect + border — use with `UIButton(type: .custom)` so the control reads as a real button (not plain link text).
+    func applySolidPrimaryCTAStyle() {
+        resetForLayerCTAStyling()
+        backgroundColor = .appPrimaryAccent
+        setTitleColor(.appPrimaryText, for: .normal)
+        titleLabel?.font = .appButtonText
+        layer.cornerRadius = 16
+        layer.masksToBounds = true
+        layer.borderWidth = 1
+        layer.borderColor = UIColor.black.withAlphaComponent(0.22).cgColor
+        contentEdgeInsets = UIEdgeInsets(top: 16, left: 24, bottom: 16, right: 24)
     }
     
     // Updates gradient frame - call this in viewDidLayoutSubviews
@@ -211,6 +252,7 @@ extension UITextField {
         textColor = .appPrimaryText
         font = .appInputText
         layer.cornerRadius = 16
+        layer.masksToBounds = true
         layer.borderWidth = 1
         layer.borderColor = UIColor.white.withAlphaComponent(0.2).cgColor
         
@@ -222,6 +264,7 @@ extension UITextField {
         blurView.layer.cornerRadius = 16
         blurView.clipsToBounds = true
         blurView.isUserInteractionEnabled = false
+        blurView.tag = 9101
         insertSubview(blurView, at: 0)
         
         // Padding
@@ -240,6 +283,33 @@ extension UITextField {
                 string: placeholderText,
                 attributes: [NSAttributedString.Key.foregroundColor: UIColor.appTertiaryText]
             )
+        }
+    }
+    
+    /// Picker-driven fields only: full hero names scale down instead of clipping; no flashing caret.
+    func applyGlassmorphismPickerFieldStyle() {
+        applyGlassmorphismStyle()
+        adjustsFontSizeToFitWidth = true
+        minimumFontSize = 10
+        textAlignment = .natural
+        tintColor = .clear
+        autocorrectionType = .no
+        spellCheckingType = .no
+        smartDashesType = .no
+        smartQuotesType = .no
+        smartInsertDeleteType = .no
+    }
+    
+    /// Call from the view controller’s `viewDidLayoutSubviews` so corners stay a true pill when height is known.
+    func refreshGlassmorphismPillCorners() {
+        let h = bounds.height
+        guard h > 1 else { return }
+        let r = h / 2
+        layer.cornerRadius = r
+        layer.masksToBounds = true
+        if let blur = subviews.first(where: { $0.tag == 9101 }) as? UIVisualEffectView {
+            blur.layer.cornerRadius = r
+            blur.clipsToBounds = true
         }
     }
     
@@ -450,6 +520,29 @@ extension UIViewController {
             // Recursively check nested subviews
             styleLabels(in: subview)
         }
+    }
+    
+    /// Extra bottom inset so scrollable content clears the tab bar when layout still overlaps it.
+    func updateScrollViewTabBarAvoidance(_ scrollView: UIScrollView) {
+        let extra: CGFloat
+        if let tab = tabBarController?.tabBar, !tab.isHidden {
+            extra = tab.frame.height + 24
+        } else {
+            extra = 24
+        }
+        scrollView.verticalScrollIndicatorInsets.bottom = extra
+        scrollView.contentInset.bottom = extra
+    }
+    
+    func updateTableViewTabBarAvoidance(_ tableView: UITableView) {
+        let extra: CGFloat
+        if let tab = tabBarController?.tabBar, !tab.isHidden {
+            extra = tab.frame.height + 24
+        } else {
+            extra = 24
+        }
+        tableView.verticalScrollIndicatorInsets.bottom = extra
+        tableView.contentInset.bottom = extra
     }
 }
 

@@ -14,8 +14,8 @@ class LandingViewController: UIViewController {
     
     // UI Elements
     private let logoImageView = UIImageView()
-    private let signUpButton = UIButton(type: .system)
-    private let haveAccountButton = UIButton(type: .system)
+    private let signUpButton = UIButton(type: .custom)
+    private let haveAccountButton = UIButton(type: .custom)
     private var gradientLayer: CAGradientLayer?
     private var videoPlayer: AVPlayer?
     private var playerLayer: AVPlayerLayer?
@@ -35,6 +35,16 @@ class LandingViewController: UIViewController {
             let nav = UINavigationController(rootViewController: self)
             window.rootViewController = nav
         }
+    }
+
+    // Keep auth entry screen stable; allow rotation elsewhere.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var shouldAutorotate: Bool { false }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
+    
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        videoPlayer?.play()
     }
     
     override func viewDidLayoutSubviews() {
@@ -80,6 +90,7 @@ class LandingViewController: UIViewController {
         
         let vLayer = AVPlayerLayer(player: player)
         vLayer.videoGravity = .resizeAspectFill
+        vLayer.frame = view.bounds
         view.layer.insertSublayer(vLayer, above: gradient)
         playerLayer = vLayer
         
@@ -104,7 +115,7 @@ class LandingViewController: UIViewController {
         }
         player.play()
         
-        // Accent overlay gradient (subtle)
+        // Accent overlay (above scrim so layer order stays predictable)
         let accent = CAGradientLayer()
         accent.colors = [
             UIColor.appSecondaryAccent.withAlphaComponent(0.25).cgColor,
@@ -113,7 +124,7 @@ class LandingViewController: UIViewController {
         accent.locations = [0.0, 1.0]
         accent.startPoint = CGPoint(x: 0.5, y: 0.0)
         accent.endPoint = CGPoint(x: 0.5, y: 1.0)
-        view.layer.insertSublayer(accent, at: 1)
+        view.layer.insertSublayer(accent, above: scrim)
         accentGradientLayer = accent
         
         // Decorative radial glows
@@ -160,7 +171,7 @@ class LandingViewController: UIViewController {
         NSLayoutConstraint.activate([
             logoImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             logoImageView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.9),
-            logoImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 48),
+            logoImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             subtitleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
             subtitleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32)
         ])
@@ -180,14 +191,14 @@ class LandingViewController: UIViewController {
         // Constraints: stack in lower half, anchored above safe area bottom
         NSLayoutConstraint.activate([
             signUpButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            signUpButton.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 28),
+            signUpButton.topAnchor.constraint(equalTo: subtitleLabel.bottomAnchor, constant: 16),
             signUpButton.widthAnchor.constraint(equalToConstant: 280),
             signUpButton.heightAnchor.constraint(equalToConstant: 56),
             haveAccountButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
             haveAccountButton.topAnchor.constraint(equalTo: signUpButton.bottomAnchor, constant: 16),
             haveAccountButton.widthAnchor.constraint(equalToConstant: 280),
             haveAccountButton.heightAnchor.constraint(equalToConstant: 56),
-            haveAccountButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24)
+            haveAccountButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -16)
         ])
     }
     
@@ -195,20 +206,11 @@ class LandingViewController: UIViewController {
         // Hide navigation bar
         navigationController?.setNavigationBarHidden(true, animated: false)
         
-        // Sign Up Button, Yellow glass container (like I have an account)
-        signUpButton.applyYellowGlassStyle()
+        signUpButton.applySolidPrimaryCTAStyle()
         signUpButton.setTitle("Sign up", for: .normal)
         
-        // Have Account Button, Glassmorphism style
-        haveAccountButton.applyGlassmorphismStyle()
+        haveAccountButton.applySecondaryStyle()
         haveAccountButton.setTitle("I have an account", for: .normal)
-        haveAccountButton.titleLabel?.font = .appButtonTextMedium
-        haveAccountButton.setTitleColor(.appPrimaryText, for: .normal)
-        
-        // Ensure title label is on top after style is applied
-        if let titleLabel = haveAccountButton.titleLabel {
-            haveAccountButton.bringSubviewToFront(titleLabel)
-        }
         
         subtitleLabel.font = .appBodyLarge
         subtitleLabel.textColor = .appPrimaryText

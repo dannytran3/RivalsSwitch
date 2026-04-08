@@ -22,12 +22,11 @@ class HomeViewController: UIViewController {
     // Hero Section
     private let heroCard = UIView()
     private let logoImageView = UIImageView()
-    // private let appNameLabel = UILabel()  // Removed per instructions
-    private let taglineLabel = UILabel()
-    private let userLabel = UILabel()
+    private let welcomeLabel = UILabel()
+    private let homeSubtitleLabel = UILabel()
     
-    // Primary CTA
-    private let primaryCTACard = UIButton(type: .system)
+    // Primary CTA (custom so gradient + subviews don’t eat touches like a system button)
+    private let primaryCTACard = UIButton(type: .custom)
     private let ctaTitleLabel = UILabel()
     private let ctaSubtitleLabel = UILabel()
     private let ctaIconView = UIImageView()
@@ -40,8 +39,11 @@ class HomeViewController: UIViewController {
     
     // Recent Match
     private let recentMatchCard = UIButton(type: .system)
+    private let recentMatchThumb = UIImageView()
     private let recentMatchTitle = UILabel()
     private let recentMatchDetail = UILabel()
+    private let recentMatchTextStack = UIStackView()
+    private let recentMatchRowStack = UIStackView()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -50,9 +52,17 @@ class HomeViewController: UIViewController {
         loadLastMatch()
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        refreshWelcomeHeader()
+        loadLastMatch()
+    }
+    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         gradientLayer?.frame = view.bounds
+        primaryCTACard.updateGradientFrame()
+        updateScrollViewTabBarAvoidance(scrollView)
     }
     
     private func setupUI() {
@@ -78,13 +88,15 @@ class HomeViewController: UIViewController {
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = true
 
         // 1. Hero Card
         heroCard.translatesAutoresizingMaskIntoConstraints = false
@@ -97,20 +109,17 @@ class HomeViewController: UIViewController {
         logoImageView.image = UIImage(named: "Logo")
         heroCard.addSubview(logoImageView)
         
-        // appNameLabel setup removed per instructions
-        taglineLabel.translatesAutoresizingMaskIntoConstraints = false
-        taglineLabel.text = "Scan to generate counter picks"
-        taglineLabel.textAlignment = .left
-        heroCard.addSubview(taglineLabel)
+        welcomeLabel.translatesAutoresizingMaskIntoConstraints = false
+        welcomeLabel.textAlignment = .center
+        welcomeLabel.numberOfLines = 0
+        heroCard.addSubview(welcomeLabel)
         
-        userLabel.translatesAutoresizingMaskIntoConstraints = false
-        userLabel.textAlignment = .left
-        if let username = UserSession.shared.username {
-            userLabel.text = "Signed in as: \(username)"
-        } else {
-            userLabel.text = "Signed in as: guest"
-        }
-        heroCard.addSubview(userLabel)
+        homeSubtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        homeSubtitleLabel.text = "Counter-picks, scoreboard scans, and party tools for Marvel Rivals."
+        homeSubtitleLabel.textAlignment = .center
+        homeSubtitleLabel.numberOfLines = 0
+        heroCard.addSubview(homeSubtitleLabel)
+        refreshWelcomeHeader()
 
         // Primary CTA Card
         primaryCTACard.translatesAutoresizingMaskIntoConstraints = false
@@ -153,6 +162,7 @@ class HomeViewController: UIViewController {
         ctaStack.addArrangedSubview(ctaTitleLabel)
         ctaStack.addArrangedSubview(ctaIconView)
         ctaStack.addArrangedSubview(ctaSubtitleLabel)
+        [ctaStack, ctaTitleLabel, ctaSubtitleLabel, ctaIconView].forEach { $0.isUserInteractionEnabled = false }
 
         NSLayoutConstraint.activate([
             ctaIconView.heightAnchor.constraint(equalToConstant: 22),
@@ -173,32 +183,18 @@ class HomeViewController: UIViewController {
 
         // Party button
         scanPhotoCard.translatesAutoresizingMaskIntoConstraints = false
-        scanPhotoCard.applyCardStyle()
-        scanPhotoCard.setTitle("Start a Party", for: .normal)
+        scanPhotoCard.layer.cornerRadius = 16
+        scanPhotoCard.layer.masksToBounds = true
         scanPhotoCard.addTarget(self, action: #selector(startPartyTapped), for: .touchUpInside)
-        if #available(iOS 15.0, *) {
-            var config = UIButton.Configuration.plain()
-            config.image = UIImage(systemName: "person.2")
-            config.imagePlacement = .leading
-            config.imagePadding = 8
-            scanPhotoCard.configuration = config
-            scanPhotoCard.tintColor = .appPrimaryText
-        }
+        styleQuickActionButton(scanPhotoCard, title: "Party", subtitle: "Party tab", systemImage: "person.2.fill")
         quickActionsStack.addArrangedSubview(scanPhotoCard)
 
         // History button
         manualEntryCard.translatesAutoresizingMaskIntoConstraints = false
-        manualEntryCard.applyCardStyle()
-        manualEntryCard.setTitle("View History", for: .normal)
+        manualEntryCard.layer.cornerRadius = 16
+        manualEntryCard.layer.masksToBounds = true
         manualEntryCard.addTarget(self, action: #selector(recentMatchTapped), for: .touchUpInside)
-        if #available(iOS 15.0, *) {
-            var config = UIButton.Configuration.plain()
-            config.image = UIImage(systemName: "clock.arrow.circlepath")
-            config.imagePlacement = .leading
-            config.imagePadding = 8
-            manualEntryCard.configuration = config
-            manualEntryCard.tintColor = .appPrimaryText
-        }
+        styleQuickActionButton(manualEntryCard, title: "History", subtitle: "Past matches", systemImage: "clock.fill")
         quickActionsStack.addArrangedSubview(manualEntryCard)
 
         // Recent match section header
@@ -212,15 +208,38 @@ class HomeViewController: UIViewController {
         recentMatchCard.addTarget(self, action: #selector(recentMatchTapped), for: .touchUpInside)
         contentView.addSubview(recentMatchCard)
 
+        recentMatchThumb.translatesAutoresizingMaskIntoConstraints = false
+        recentMatchThumb.contentMode = .scaleAspectFill
+        recentMatchThumb.clipsToBounds = true
+        recentMatchThumb.layer.cornerRadius = 10
+        recentMatchThumb.layer.borderWidth = 1
+        recentMatchThumb.layer.borderColor = UIColor.appBorderColor.cgColor
+        recentMatchThumb.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+        recentMatchThumb.isHidden = true
+
         recentMatchTitle.translatesAutoresizingMaskIntoConstraints = false
         recentMatchTitle.text = "Last Match"
         recentMatchTitle.textAlignment = .left
-        recentMatchCard.addSubview(recentMatchTitle)
 
         recentMatchDetail.translatesAutoresizingMaskIntoConstraints = false
         recentMatchDetail.textAlignment = .left
         recentMatchDetail.numberOfLines = 0
-        recentMatchCard.addSubview(recentMatchDetail)
+
+        recentMatchTextStack.translatesAutoresizingMaskIntoConstraints = false
+        recentMatchTextStack.axis = .vertical
+        recentMatchTextStack.spacing = 6
+        recentMatchTextStack.alignment = .leading
+        recentMatchTextStack.addArrangedSubview(recentMatchTitle)
+        recentMatchTextStack.addArrangedSubview(recentMatchDetail)
+
+        recentMatchRowStack.axis = .horizontal
+        recentMatchRowStack.spacing = 14
+        recentMatchRowStack.alignment = .top
+        recentMatchRowStack.translatesAutoresizingMaskIntoConstraints = false
+        recentMatchRowStack.addArrangedSubview(recentMatchThumb)
+        recentMatchRowStack.addArrangedSubview(recentMatchTextStack)
+        recentMatchCard.addSubview(recentMatchRowStack)
+        [recentMatchRowStack, recentMatchTextStack, recentMatchTitle, recentMatchDetail, recentMatchThumb].forEach { $0.isUserInteractionEnabled = false }
 
         // Layout all sections
         NSLayoutConstraint.activate([
@@ -233,14 +252,14 @@ class HomeViewController: UIViewController {
             logoImageView.heightAnchor.constraint(equalToConstant: 84),
             logoImageView.widthAnchor.constraint(lessThanOrEqualToConstant: 300),
 
-            taglineLabel.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 8),
-            taglineLabel.leadingAnchor.constraint(equalTo: heroCard.leadingAnchor, constant: 18),
-            taglineLabel.trailingAnchor.constraint(equalTo: heroCard.trailingAnchor, constant: -18),
+            welcomeLabel.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 12),
+            welcomeLabel.leadingAnchor.constraint(equalTo: heroCard.leadingAnchor, constant: 18),
+            welcomeLabel.trailingAnchor.constraint(equalTo: heroCard.trailingAnchor, constant: -18),
 
-            userLabel.topAnchor.constraint(equalTo: taglineLabel.bottomAnchor, constant: 8),
-            userLabel.leadingAnchor.constraint(equalTo: heroCard.leadingAnchor, constant: 18),
-            userLabel.trailingAnchor.constraint(equalTo: heroCard.trailingAnchor, constant: -18),
-            userLabel.bottomAnchor.constraint(equalTo: heroCard.bottomAnchor, constant: -20),
+            homeSubtitleLabel.topAnchor.constraint(equalTo: welcomeLabel.bottomAnchor, constant: 8),
+            homeSubtitleLabel.leadingAnchor.constraint(equalTo: heroCard.leadingAnchor, constant: 18),
+            homeSubtitleLabel.trailingAnchor.constraint(equalTo: heroCard.trailingAnchor, constant: -18),
+            homeSubtitleLabel.bottomAnchor.constraint(equalTo: heroCard.bottomAnchor, constant: -20),
 
             primaryCTACard.topAnchor.constraint(equalTo: heroCard.bottomAnchor, constant: 48),
             primaryCTACard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
@@ -258,7 +277,7 @@ class HomeViewController: UIViewController {
             quickActionsStack.topAnchor.constraint(equalTo: quickActionsHeaderLabel.bottomAnchor, constant: 12),
             quickActionsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             quickActionsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
-            quickActionsStack.heightAnchor.constraint(equalToConstant: 72),
+            quickActionsStack.heightAnchor.constraint(equalToConstant: 96),
 
             recentHeaderLabel.topAnchor.constraint(equalTo: quickActionsStack.bottomAnchor, constant: 22),
             recentHeaderLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
@@ -268,14 +287,15 @@ class HomeViewController: UIViewController {
             recentMatchCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             recentMatchCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
 
-            recentMatchTitle.topAnchor.constraint(equalTo: recentMatchCard.topAnchor, constant: 20),
-            recentMatchTitle.leadingAnchor.constraint(equalTo: recentMatchCard.leadingAnchor, constant: 20),
-            recentMatchTitle.trailingAnchor.constraint(equalTo: recentMatchCard.trailingAnchor, constant: -20),
+            recentMatchRowStack.topAnchor.constraint(equalTo: recentMatchCard.topAnchor, constant: 18),
+            recentMatchRowStack.leadingAnchor.constraint(equalTo: recentMatchCard.leadingAnchor, constant: 18),
+            recentMatchRowStack.trailingAnchor.constraint(equalTo: recentMatchCard.trailingAnchor, constant: -18),
+            recentMatchRowStack.bottomAnchor.constraint(equalTo: recentMatchCard.bottomAnchor, constant: -18),
 
-            recentMatchDetail.topAnchor.constraint(equalTo: recentMatchTitle.bottomAnchor, constant: 6),
-            recentMatchDetail.leadingAnchor.constraint(equalTo: recentMatchCard.leadingAnchor, constant: 20),
-            recentMatchDetail.trailingAnchor.constraint(equalTo: recentMatchCard.trailingAnchor, constant: -20),
-            recentMatchDetail.bottomAnchor.constraint(equalTo: recentMatchCard.bottomAnchor, constant: -20),
+            recentMatchThumb.widthAnchor.constraint(equalToConstant: 58),
+            recentMatchThumb.heightAnchor.constraint(equalToConstant: 58),
+            
+            recentMatchCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -32)
         ])
     }
 
@@ -287,10 +307,10 @@ class HomeViewController: UIViewController {
         // appNameLabel.font = .appHeading2
         // appNameLabel.textColor = .appPrimaryAccent  // Removed per instructions
         
-        taglineLabel.font = .appBodyLarge
-        taglineLabel.textColor = .appPrimaryText
-        userLabel.font = .appBodySmall
-        userLabel.textColor = .appSecondaryText
+        welcomeLabel.font = .appHeading3
+        welcomeLabel.textColor = .appPrimaryText
+        homeSubtitleLabel.font = .appBodyMedium
+        homeSubtitleLabel.textColor = .appSecondaryText
         
         // CTA - make title bold for emphasis
         if #available(iOS 15.0, *) {
@@ -309,12 +329,6 @@ class HomeViewController: UIViewController {
         ctaSubtitleLabel.font = .appBodyMedium
         ctaSubtitleLabel.textColor = .appSecondaryText
         
-        // Quick Actions
-        scanPhotoCard.setTitleColor(.appPrimaryText, for: .normal)
-        scanPhotoCard.titleLabel?.font = .appBodyLarge
-        manualEntryCard.setTitleColor(.appPrimaryText, for: .normal)
-        manualEntryCard.titleLabel?.font = .appBodyLarge
-        
         // Recent Match
         recentMatchTitle.font = .appBodyLarge
         recentMatchTitle.textColor = .appPrimaryText
@@ -328,28 +342,83 @@ class HomeViewController: UIViewController {
         }
     }
 
+    /// Glass-style quick action tiles (iOS 15+ uses `UIButton.Configuration`).
+    private func styleQuickActionButton(_ button: UIButton, title: String, subtitle: String, systemImage: String) {
+        if #available(iOS 15.0, *) {
+            var config = UIButton.Configuration.plain()
+            config.image = UIImage(systemName: systemImage)
+            config.imagePlacement = .top
+            config.imagePadding = 6
+            config.titleAlignment = .center
+            config.titleLineBreakMode = .byTruncatingTail
+            config.subtitleLineBreakMode = .byTruncatingTail
+            config.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 8, bottom: 12, trailing: 8)
+            var titleAttr = AttributeContainer()
+            titleAttr.font = UIFont.systemFont(ofSize: 15, weight: .semibold)
+            titleAttr.foregroundColor = UIColor.appPrimaryText
+            var subAttr = AttributeContainer()
+            subAttr.font = UIFont.appBodySmall
+            subAttr.foregroundColor = UIColor.appSecondaryText
+            config.attributedTitle = AttributedString(title, attributes: titleAttr)
+            config.attributedSubtitle = AttributedString(subtitle, attributes: subAttr)
+            button.configuration = config
+            button.backgroundColor = UIColor.white.withAlphaComponent(0.08)
+            button.layer.borderWidth = 1
+            button.layer.borderColor = UIColor.appBorderColor.cgColor
+        } else {
+            button.applyCardStyle()
+            button.setTitle("\(title)\n\(subtitle)", for: .normal)
+            button.titleLabel?.numberOfLines = 2
+            button.titleLabel?.textAlignment = .center
+            button.setTitleColor(.appPrimaryText, for: .normal)
+            button.setImage(UIImage(systemName: systemImage), for: .normal)
+            button.tintColor = .appPrimaryAccent
+        }
+    }
+    
+    
+    private func updateRecentMatchThumbnail(for summary: String) {
+        MatchSummaryThumbnail.configureImageView(recentMatchThumb, summary: summary)
+    }
+    
     // Loads the most recently saved match and shows it on the home screen
+    private func refreshWelcomeHeader() {
+        let name = UserSession.shared.username?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if name.isEmpty {
+            welcomeLabel.text = "Welcome to RivalsSwitch"
+        } else {
+            welcomeLabel.text = "Welcome back, \(name)"
+        }
+    }
+    
     private func loadLastMatch() {
         let matches = MatchStore.shared.loadMatches()
-        guard let last = matches.last else {
+        guard let newest = matches.first else {
             recentMatchDetail.text = "No matches yet."
+            recentMatchThumb.isHidden = true
+            recentMatchThumb.image = nil
             return
         }
-        recentMatchDetail.text = last
+        recentMatchDetail.text = newest
+        updateRecentMatchThumbnail(for: newest)
     }
     
     
     @objc private func startNewMatchTapped() {
-        
-        // Clear old match data before starting fresh
         MatchStore.shared.clearCurrentMatch()
+        if selectTabBarRoot(matching: CameraScanViewController.self) {
+            return
+        }
         let cameraVC = CameraScanViewController()
         navigationController?.pushViewController(cameraVC, animated: true)
     }
     
     @objc private func scanPhotoTapped() {
-        let cameraVC = CameraScanViewController()
-        navigationController?.pushViewController(cameraVC, animated: true)
+        MatchStore.shared.clearCurrentMatch()
+        if selectTabBarRoot(matching: CameraScanViewController.self) {
+            return
+        }
+        navigationController?.pushViewController(CameraScanViewController(), animated: true)
     }
     
     @objc private func enterManuallyTapped() {
@@ -358,18 +427,43 @@ class HomeViewController: UIViewController {
     }
     
     @objc private func recentMatchTapped() {
+        if selectTabBarRoot(matching: HistoryViewController.self) {
+            return
+        }
         let historyVC = HistoryViewController()
         navigationController?.pushViewController(historyVC, animated: true)
     }
     
     @objc private func startPartyTapped() {
-        // Navigate to Party tab (index 5)
-        guard let tabBarController = self.tabBarController else {
+        openPartyScreen()
+    }
+}
+
+extension UIViewController {
+    /// Selects the tab whose navigation root matches `type`. Only pops to root when switching from another tab (keeps Party / SwiftUI state).
+    @discardableResult
+    func selectTabBarRoot(matching type: UIViewController.Type) -> Bool {
+        guard let tabBar = tabBarController, let controllers = tabBar.viewControllers else { return false }
+        for (index, vc) in controllers.enumerated() {
+            guard let nav = vc as? UINavigationController else { continue }
+            if nav.viewControllers.first.map({ $0.isKind(of: type) }) == true {
+                let alreadyHere = (tabBar.selectedIndex == index)
+                tabBar.selectedIndex = index
+                if !alreadyHere {
+                    nav.popToRootViewController(animated: false)
+                }
+                return true
+            }
+        }
+        return false
+    }
+    
+    /// Opens Party from a tab root, or pushes it if the Party tab was removed.
+    func openPartyScreen() {
+        if selectTabBarRoot(matching: PartyViewController.self) {
             return
         }
-        
-        // Switch to Party tab - user will manually create party from there
-        tabBarController.selectedIndex = 5
+        navigationController?.pushViewController(PartyViewController(), animated: true)
     }
 }
 

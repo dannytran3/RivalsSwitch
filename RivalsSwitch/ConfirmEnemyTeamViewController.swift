@@ -7,25 +7,29 @@
 
 import UIKit
 
-class ConfirmEnemyTeamViewController: UIViewController {
+class ConfirmEnemyTeamViewController: UIViewController, UITextFieldDelegate, UIPickerViewDataSource, UIPickerViewDelegate {
     
-    // UI
-    private let titleLabel = UILabel()
+    private let subtitleLabel = UILabel()
     private let enemy1TextField = UITextField()
     private let enemy2TextField = UITextField()
     private let enemy3TextField = UITextField()
     private let enemy4TextField = UITextField()
     private let enemy5TextField = UITextField()
     private let enemy6TextField = UITextField()
-    private let doneButton = UIButton(type: .system)
-    private let heroSuggestionsTableView = UITableView()
+    private let doneButton = UIButton(type: .custom)
+    private let enemyPicker = UIPickerView()
     private var gradientLayer: CAGradientLayer?
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
-    // Data
-    private var filteredHeroNames: [String] = []
+    /// Row 0 clears the slot; remaining rows are sorted hero names.
+    private let noneRowTitle = "None"
+    private let heroNames: [String]
+    private var pickerTitles: [String] { [noneRowTitle] + heroNames }
+    
     private weak var activeEnemyTextField: UITextField?
+    private var enemyPortraitViews: [UIImageView] = []
+    
     private lazy var enemyTextFields: [UITextField] = [
         enemy1TextField,
         enemy2TextField,
@@ -34,8 +38,17 @@ class ConfirmEnemyTeamViewController: UIViewController {
         enemy5TextField,
         enemy6TextField
     ]
-    private let allHeroNames = HeroRegistry.shared.allHeroes.map { $0.name }.sorted()
-
+    
+    init() {
+        self.heroNames = HeroRegistry.shared.allHeroes.map { $0.name }.sorted()
+        super.init(nibName: nil, bundle: nil)
+    }
+    
+    required init?(coder: NSCoder) {
+        self.heroNames = HeroRegistry.shared.allHeroes.map { $0.name }.sorted()
+        super.init(coder: coder)
+    }
+    
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
@@ -47,12 +60,17 @@ class ConfirmEnemyTeamViewController: UIViewController {
         enemy4TextField.text = MatchStore.shared.enemy4
         enemy5TextField.text = MatchStore.shared.enemy5
         enemy6TextField.text = MatchStore.shared.enemy6
+        
+        for i in enemyTextFields.indices {
+            refreshPortrait(at: i)
+        }
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         gradientLayer?.frame = view.bounds
-        doneButton.updateGradientFrame()
+        updateScrollViewTabBarAvoidance(scrollView)
+        enemyTextFields.forEach { $0.refreshGlassmorphismPillCorners() }
     }
     
     private func setupUI() {
@@ -72,29 +90,34 @@ class ConfirmEnemyTeamViewController: UIViewController {
         contentView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
+        scrollView.alwaysBounceVertical = true
         
-        titleLabel.translatesAutoresizingMaskIntoConstraints = false
-        titleLabel.text = "Confirm Enemy Team"
-        titleLabel.textAlignment = .center
-        contentView.addSubview(titleLabel)
+        subtitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        subtitleLabel.text = "Top → bottom to match the scoreboard. Rivals allows each hero only once per team — if OCR fills the same hero twice, the later slot is left blank.\n\nDouble-check each slot — tap the field to change the hero."
+        subtitleLabel.textAlignment = .center
+        subtitleLabel.numberOfLines = 0
+        contentView.addSubview(subtitleLabel)
+        
+        enemyPicker.dataSource = self
+        enemyPicker.delegate = self
+        
+        let toolbar = UIToolbar()
+        toolbar.sizeToFit()
+        toolbar.items = [
+            UIBarButtonItem(barButtonSystemItem: .flexibleSpace, target: nil, action: nil),
+            UIBarButtonItem(title: "Done", style: .done, target: self, action: #selector(enemyPickerDone))
+        ]
         
         enemyTextFields.forEach { textField in
             textField.translatesAutoresizingMaskIntoConstraints = false
             textField.autocapitalizationType = .words
             textField.autocorrectionType = .no
             textField.spellCheckingType = .no
-            textField.clearButtonMode = .whileEditing
-            contentView.addSubview(textField)
+            textField.clearButtonMode = .never
+            textField.delegate = self
+            textField.inputView = enemyPicker
+            textField.inputAccessoryView = toolbar
         }
-        
-        heroSuggestionsTableView.translatesAutoresizingMaskIntoConstraints = false
-        heroSuggestionsTableView.register(UITableViewCell.self, forCellReuseIdentifier: "HeroSuggestionCell")
-        heroSuggestionsTableView.dataSource = self
-        heroSuggestionsTableView.delegate = self
-        heroSuggestionsTableView.isHidden = true
-        heroSuggestionsTableView.layer.cornerRadius = 12
-        heroSuggestionsTableView.clipsToBounds = true
-        contentView.addSubview(heroSuggestionsTableView)
         
         doneButton.translatesAutoresizingMaskIntoConstraints = false
         doneButton.setTitle("Done", for: .normal)
@@ -105,37 +128,77 @@ class ConfirmEnemyTeamViewController: UIViewController {
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
             
-            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor),
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
             
-            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
-            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
-            titleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 40)
+            subtitleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            subtitleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            subtitleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 20)
         ])
         
-        var previousView: UIView = titleLabel
-        enemyTextFields.enumerated().forEach { index, textField in
-            textField.placeholder = "Enemy \(index + 1)"
+        var previousView: UIView = subtitleLabel
+        enemyPortraitViews = []
+        for index in enemyTextFields.indices {
+            let portrait = UIImageView()
+            portrait.translatesAutoresizingMaskIntoConstraints = false
+            portrait.contentMode = .scaleAspectFill
+            portrait.clipsToBounds = true
+            portrait.layer.cornerRadius = 26
+            portrait.layer.borderWidth = 1
+            portrait.layer.borderColor = UIColor.appBorderColor.cgColor
+            portrait.backgroundColor = UIColor.white.withAlphaComponent(0.06)
+            portrait.setContentHuggingPriority(.required, for: .horizontal)
+            enemyPortraitViews.append(portrait)
+            
+            let prefixLabel = UILabel()
+            prefixLabel.translatesAutoresizingMaskIntoConstraints = false
+            prefixLabel.text = "Enemy hero \(index + 1):"
+            prefixLabel.textAlignment = .natural
+            prefixLabel.font = UIFont.systemFont(ofSize: 14, weight: .semibold)
+            prefixLabel.textColor = .appSecondaryText
+            prefixLabel.setContentCompressionResistancePriority(.required, for: .horizontal)
+            // Same width every row so the hero field gets identical horizontal space ("1" vs "6" etc. differ in glyph width).
+            let prefixColumnWidth: CGFloat = 132
+            
+            let textField = enemyTextFields[index]
+            textField.placeholder = "None"
+            textField.setContentHuggingPriority(.defaultLow, for: .horizontal)
+            textField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            
+            let nameRow = UIStackView(arrangedSubviews: [prefixLabel, textField])
+            nameRow.translatesAutoresizingMaskIntoConstraints = false
+            nameRow.axis = .horizontal
+            nameRow.spacing = 8
+            nameRow.alignment = .center
+            nameRow.distribution = .fill
+            
+            let rowStack = UIStackView(arrangedSubviews: [portrait, nameRow])
+            rowStack.translatesAutoresizingMaskIntoConstraints = false
+            rowStack.axis = .horizontal
+            rowStack.spacing = 12
+            rowStack.alignment = .center
+            contentView.addSubview(rowStack)
+            
             NSLayoutConstraint.activate([
-                textField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
-                textField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
-                textField.topAnchor.constraint(equalTo: previousView.bottomAnchor, constant: 20),
-                textField.heightAnchor.constraint(equalToConstant: 56)
+                rowStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+                rowStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+                rowStack.topAnchor.constraint(equalTo: previousView.bottomAnchor, constant: index == 0 ? 22 : 16),
+                rowStack.heightAnchor.constraint(greaterThanOrEqualToConstant: 56),
+                
+                portrait.widthAnchor.constraint(equalToConstant: 52),
+                portrait.heightAnchor.constraint(equalToConstant: 52),
+                
+                prefixLabel.widthAnchor.constraint(equalToConstant: prefixColumnWidth)
             ])
-            previousView = textField
+            previousView = rowStack
         }
         
         NSLayoutConstraint.activate([
-            heroSuggestionsTableView.leadingAnchor.constraint(equalTo: enemy1TextField.leadingAnchor),
-            heroSuggestionsTableView.trailingAnchor.constraint(equalTo: enemy1TextField.trailingAnchor),
-            heroSuggestionsTableView.topAnchor.constraint(equalTo: enemy1TextField.bottomAnchor, constant: 8),
-            heroSuggestionsTableView.heightAnchor.constraint(equalToConstant: 220),
-            
             doneButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
             doneButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
             doneButton.topAnchor.constraint(equalTo: previousView.bottomAnchor, constant: 40),
@@ -143,64 +206,96 @@ class ConfirmEnemyTeamViewController: UIViewController {
             doneButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
         ])
         
-        enemyTextFields.forEach { textField in
-            textField.addTarget(self, action: #selector(textFieldDidBeginEditing(_:)), for: .editingDidBegin)
-            textField.addTarget(self, action: #selector(textFieldDidEndEditing(_:)), for: .editingDidEnd)
-            textField.addTarget(self, action: #selector(textFieldEditingChanged(_:)), for: .editingChanged)
-        }
+        let tap = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
     }
     
     private func setupStyling() {
         navigationController?.navigationBar.applyAppStyle()
         navigationItem.title = "Confirm Enemy Team"
         
-        titleLabel.font = .appHeading3
-        titleLabel.textColor = .appPrimaryText
+        subtitleLabel.font = .appBodyMedium
+        subtitleLabel.textColor = .appSecondaryText
         
         enemyTextFields.forEach { textField in
-            textField.applyGlassmorphismStyle()
+            textField.applyGlassmorphismPickerFieldStyle()
         }
         
-        doneButton.applyGradientStyle()
+        doneButton.applySolidPrimaryCTAStyle()
     }
     
-    @objc private func textFieldDidBeginEditing(_ textField: UITextField) {
+    @objc private func enemyPickerDone() {
+        view.endEditing(true)
+    }
+    
+    @objc private func backgroundTapped() {
+        view.endEditing(true)
+    }
+    
+    private func refreshPortrait(at index: Int) {
+        guard index >= 0 && index < enemyPortraitViews.count else { return }
+        HeroRegistry.shared.configurePortraitImageView(enemyPortraitViews[index], heroDisplayName: enemyTextFields[index].text ?? "")
+    }
+    
+    private func pickerRow(forStoredHeroName text: String) -> Int {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty { return 0 }
+        if let idx = heroNames.firstIndex(where: { $0.caseInsensitiveCompare(trimmed) == .orderedSame }) {
+            return idx + 1
+        }
+        return 0
+    }
+    
+    private func heroName(forPickerRow row: Int) -> String {
+        guard row > 0, row - 1 < heroNames.count else { return "" }
+        return heroNames[row - 1]
+    }
+    
+    // MARK: - UITextFieldDelegate
+    
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        guard enemyTextFields.contains(textField) else { return }
         activeEnemyTextField = textField
         textField.updateFocusState(true)
-        updateHeroSuggestions(for: textField.text ?? "")
+        let row = pickerRow(forStoredHeroName: textField.text ?? "")
+        enemyPicker.selectRow(row, inComponent: 0, animated: false)
     }
     
-    @objc private func textFieldDidEndEditing(_ textField: UITextField) {
+    func textFieldDidEndEditing(_ textField: UITextField) {
         textField.updateFocusState(false)
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-            if self.enemyTextFields.contains(where: { $0.isFirstResponder }) == false {
-                self.heroSuggestionsTableView.isHidden = true
-            }
+        if let idx = enemyTextFields.firstIndex(where: { $0 === textField }) {
+            refreshPortrait(at: idx)
         }
     }
     
-    @objc private func textFieldEditingChanged(_ textField: UITextField) {
-        activeEnemyTextField = textField
-        updateHeroSuggestions(for: textField.text ?? "")
+    func textField(_ textField: UITextField, shouldChangeCharactersIn range: NSRange, replacementString string: String) -> Bool {
+        false
     }
     
-    private func updateHeroSuggestions(for query: String) {
-        let trimmedQuery = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        
-        if trimmedQuery.isEmpty {
-            filteredHeroNames = allHeroNames
-        } else {
-            filteredHeroNames = allHeroNames.filter { heroName in
-                heroName.lowercased().contains(trimmedQuery)
-            }
-        }
-        
-        heroSuggestionsTableView.isHidden = filteredHeroNames.isEmpty || activeEnemyTextField == nil
-        heroSuggestionsTableView.reloadData()
+    // MARK: - UIPickerView
+    
+    func numberOfComponents(in pickerView: UIPickerView) -> Int { 1 }
+    
+    func pickerView(_ pickerView: UIPickerView, numberOfRowsInComponent component: Int) -> Int {
+        pickerTitles.count
     }
-
+    
+    func pickerView(_ pickerView: UIPickerView, titleForRow row: Int, forComponent component: Int) -> String? {
+        pickerTitles[row]
+    }
+    
+    func pickerView(_ pickerView: UIPickerView, didSelectRow row: Int, inComponent component: Int) {
+        let name = heroName(forPickerRow: row)
+        activeEnemyTextField?.text = name.isEmpty ? "" : name
+        if let tf = activeEnemyTextField, let idx = enemyTextFields.firstIndex(where: { $0 === tf }) {
+            refreshPortrait(at: idx)
+        }
+    }
+    
     @objc private func doneTapped() {
+        view.endEditing(true)
+        
         MatchStore.shared.enemy1 = enemy1TextField.text ?? ""
         MatchStore.shared.enemy2 = enemy2TextField.text ?? ""
         MatchStore.shared.enemy3 = enemy3TextField.text ?? ""
@@ -226,9 +321,17 @@ class ConfirmEnemyTeamViewController: UIViewController {
             enemyTeam: enemyTeam
         )
 
+        MatchStore.shared.recommendedHero2 = ""
+        MatchStore.shared.recommendedReason2 = ""
+        MatchStore.shared.recommendedHero3 = ""
+        MatchStore.shared.recommendedReason3 = ""
+
         if recs.count > 0 {
             MatchStore.shared.recommendedHero1 = recs[0].0
             MatchStore.shared.recommendedReason1 = recs[0].1
+        } else {
+            MatchStore.shared.recommendedHero1 = ""
+            MatchStore.shared.recommendedReason1 = ""
         }
 
         if recs.count > 1 {
@@ -243,25 +346,5 @@ class ConfirmEnemyTeamViewController: UIViewController {
 
         let recommendationsVC = RecommendationsViewController()
         navigationController?.pushViewController(recommendationsVC, animated: true)
-    }
-}
-
-extension ConfirmEnemyTeamViewController: UITableViewDataSource, UITableViewDelegate {
-    func tableView(_ tableView: UITableView, numberOfRowsInSection section: Int) -> Int {
-        filteredHeroNames.count
-    }
-    
-    func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
-        let cell = tableView.dequeueReusableCell(withIdentifier: "HeroSuggestionCell", for: indexPath)
-        var config = cell.defaultContentConfiguration()
-        config.text = filteredHeroNames[indexPath.row]
-        cell.contentConfiguration = config
-        return cell
-    }
-    
-    func tableView(_ tableView: UITableView, didSelectRowAt indexPath: IndexPath) {
-        activeEnemyTextField?.text = filteredHeroNames[indexPath.row]
-        heroSuggestionsTableView.isHidden = true
-        activeEnemyTextField?.resignFirstResponder()
     }
 }

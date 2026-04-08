@@ -145,9 +145,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WQN5K9D3JR;
+				DEVELOPMENT_TEAM = NULDV653KJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RivalsSwitch/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "RivalsSwitch uses the camera to scan your match scoreboard and extract heroes and stats.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "RivalsSwitch lets you choose a scoreboard screenshot from your photo library to scan for heroes and stats.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;
@@ -177,9 +179,11 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = WQN5K9D3JR;
+				DEVELOPMENT_TEAM = NULDV653KJ;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = RivalsSwitch/Info.plist;
+				INFOPLIST_KEY_NSCameraUsageDescription = "RivalsSwitch uses the camera to scan your match scoreboard and extract heroes and stats.";
+				INFOPLIST_KEY_NSPhotoLibraryUsageDescription = "RivalsSwitch lets you choose a scoreboard screenshot from your photo library to scan for heroes and stats.";
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchStoryboardName = LaunchScreen;
 				INFOPLIST_KEY_UIMainStoryboardFile = Main;

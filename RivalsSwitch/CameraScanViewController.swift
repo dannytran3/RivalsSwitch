@@ -29,11 +29,19 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     }
     
     // UI Elements
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
+    private let introTitleLabel = UILabel()
+    private let tipsLabel = UILabel()
+    private let examplePane = UIView()
+    private let exampleImageView = UIImageView()
+    private let exampleCaptionLabel = UILabel()
+    private let yourPhotoCaptionLabel = UILabel()
     private let photoImageView = UIImageView()
     private let detectedHeroesLabel = UILabel()
-    private let takePhotoButton = UIButton(type: .system)
-    private let usePhotoButton = UIButton(type: .system)
-    private let retakePhotoButton = UIButton(type: .system)
+    private let takePhotoButton = UIButton(type: .custom)
+    private let usePhotoButton = UIButton(type: .custom)
+    private let retakePhotoButton = UIButton(type: .custom)
     private let imagePicker = UIImagePickerController()
     private var gradientLayer: CAGradientLayer?
     
@@ -58,7 +66,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         
         // Keep background and gradient button styling updated on layout changes
         gradientLayer?.frame = view.bounds
-        usePhotoButton.updateGradientFrame()
+        updateScrollViewTabBarAvoidance(scrollView)
     }
     
     private func setupUI() {
@@ -75,72 +83,191 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // Image view used to preview the selected scoreboard photo
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = true
+        view.addSubview(scrollView)
+        
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
+        
+        introTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        introTitleLabel.text = "Scoreboard screenshot"
+        introTitleLabel.textAlignment = .natural
+        introTitleLabel.numberOfLines = 0
+        contentView.addSubview(introTitleLabel)
+        
+        tipsLabel.translatesAutoresizingMaskIntoConstraints = false
+        tipsLabel.text = "Use the in-game Tab scoreboard. Your hero is read from the bottom stats bar (explicit name next to your portrait). K/D/A is taken from your team row that matches that hero — not from highlight color. Enemies are read from the right column only.\n\nBest results: capture when every portrait is visible and not covered. During respawn, large timer numbers often sit on top of faces and confuse scanning."
+        tipsLabel.textAlignment = .natural
+        tipsLabel.numberOfLines = 0
+        contentView.addSubview(tipsLabel)
+        
+        examplePane.translatesAutoresizingMaskIntoConstraints = false
+        examplePane.applyCardStyle()
+        contentView.addSubview(examplePane)
+        
+        exampleImageView.translatesAutoresizingMaskIntoConstraints = false
+        exampleImageView.contentMode = .scaleAspectFit
+        exampleImageView.layer.cornerRadius = 12
+        exampleImageView.clipsToBounds = true
+        exampleImageView.backgroundColor = UIColor.white.withAlphaComponent(0.04)
+        
+        func loadBundledScoreboardExample() -> UIImage? {
+            if let img = UIImage(named: "ScoreboardExample") { return img }
+            
+            let candidates: [URL] = [
+                Bundle.main.url(forResource: "ScoreboardExample", withExtension: "jpeg", subdirectory: "MarvalRivals-icons"),
+                Bundle.main.url(forResource: "ScoreboardExample", withExtension: "jpg", subdirectory: "MarvalRivals-icons"),
+                Bundle.main.url(forResource: "ScoreboardExample", withExtension: "jpeg", subdirectory: nil),
+                Bundle.main.url(forResource: "ScoreboardExample", withExtension: "jpg", subdirectory: nil),
+            ].compactMap { $0 }
+            
+            for url in candidates {
+                if let data = try? Data(contentsOf: url), let img = UIImage(data: data) { return img }
+            }
+            
+            // Some builds flatten/sync resources differently; fall back to scanning for the filename.
+            for sub in ["MarvalRivals-icons", nil] as [String?] {
+                if let urls = Bundle.main.urls(forResourcesWithExtension: "jpeg", subdirectory: sub) {
+                    if let url = urls.first(where: { $0.lastPathComponent.lowercased() == "scoreboardexample.jpeg" }),
+                       let data = try? Data(contentsOf: url),
+                       let img = UIImage(data: data) {
+                        return img
+                    }
+                }
+                if let urls = Bundle.main.urls(forResourcesWithExtension: "jpg", subdirectory: sub) {
+                    if let url = urls.first(where: { $0.lastPathComponent.lowercased() == "scoreboardexample.jpg" }),
+                       let data = try? Data(contentsOf: url),
+                       let img = UIImage(data: data) {
+                        return img
+                    }
+                }
+            }
+            return nil
+        }
+        
+        let example = loadBundledScoreboardExample()
+        let didLoadExample = (example != nil)
+        if let example {
+            exampleImageView.image = example
+        } else {
+            let sym = UIImage(systemName: "photo.on.rectangle.angled")
+            exampleImageView.image = sym
+            exampleImageView.tintColor = .appTertiaryText
+        }
+        examplePane.addSubview(exampleImageView)
+        
+        exampleCaptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        exampleCaptionLabel.text = didLoadExample
+            ? "Example: tab scoreboard with clear portraits."
+            : "Placeholder — missing ScoreboardExample.jpeg in app bundle."
+        exampleCaptionLabel.textAlignment = .center
+        exampleCaptionLabel.numberOfLines = 0
+        examplePane.addSubview(exampleCaptionLabel)
+        
+        yourPhotoCaptionLabel.translatesAutoresizingMaskIntoConstraints = false
+        yourPhotoCaptionLabel.text = "Your photo"
+        yourPhotoCaptionLabel.textAlignment = .natural
+        contentView.addSubview(yourPhotoCaptionLabel)
+        
+        // Preview of the user's scoreboard photo
         photoImageView.translatesAutoresizingMaskIntoConstraints = false
         photoImageView.backgroundColor = .appSecondaryBackground
         photoImageView.contentMode = .scaleAspectFit
         photoImageView.layer.cornerRadius = 16
         photoImageView.layer.borderWidth = 2
         photoImageView.layer.borderColor = UIColor.appBorderColor.cgColor
-        view.addSubview(photoImageView)
+        contentView.addSubview(photoImageView)
         
-        // Label that shows scan status to the user
         detectedHeroesLabel.translatesAutoresizingMaskIntoConstraints = false
-        detectedHeroesLabel.text = "Take a photo of the scoreboard"
+        detectedHeroesLabel.text = "Tap the button below to take a photo or choose a screenshot, then we’ll scan it."
         detectedHeroesLabel.textAlignment = .center
         detectedHeroesLabel.numberOfLines = 0
-        view.addSubview(detectedHeroesLabel)
+        contentView.addSubview(detectedHeroesLabel)
         
-        // Take Photo Button
         takePhotoButton.translatesAutoresizingMaskIntoConstraints = false
-        takePhotoButton.setTitle("Take Photo", for: .normal)
+        takePhotoButton.setTitle("Take or upload photo", for: .normal)
         takePhotoButton.addTarget(self, action: #selector(takePhotoTapped), for: .touchUpInside)
-        view.addSubview(takePhotoButton)
+        contentView.addSubview(takePhotoButton)
         
-        // Use Photo Button
         usePhotoButton.translatesAutoresizingMaskIntoConstraints = false
         usePhotoButton.setTitle("Use Photo", for: .normal)
         usePhotoButton.addTarget(self, action: #selector(usePhotoTapped), for: .touchUpInside)
         usePhotoButton.isHidden = true
-        view.addSubview(usePhotoButton)
+        contentView.addSubview(usePhotoButton)
         
-        // Retake Photo Button
         retakePhotoButton.translatesAutoresizingMaskIntoConstraints = false
         retakePhotoButton.setTitle("Retake Photo", for: .normal)
         retakePhotoButton.addTarget(self, action: #selector(retakePhotoTapped), for: .touchUpInside)
         retakePhotoButton.isHidden = true
-        view.addSubview(retakePhotoButton)
+        contentView.addSubview(retakePhotoButton)
         
-        // Constraints
+        let side: CGFloat = 24
+        let inset: CGFloat = 32
         NSLayoutConstraint.activate([
-            // Photo Image View
-            photoImageView.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            photoImageView.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            photoImageView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 40),
-            photoImageView.heightAnchor.constraint(equalToConstant: 300),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
             
-            // Detected Heroes Label
-            detectedHeroesLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            detectedHeroesLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            detectedHeroesLabel.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 20),
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
             
-            // Take Photo Button
-            takePhotoButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            takePhotoButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            takePhotoButton.topAnchor.constraint(equalTo: detectedHeroesLabel.bottomAnchor, constant: 32),
+            introTitleLabel.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 16),
+            introTitleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            introTitleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            
+            tipsLabel.topAnchor.constraint(equalTo: introTitleLabel.bottomAnchor, constant: 10),
+            tipsLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            tipsLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            
+            examplePane.topAnchor.constraint(equalTo: tipsLabel.bottomAnchor, constant: 16),
+            examplePane.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            examplePane.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            examplePane.heightAnchor.constraint(greaterThanOrEqualToConstant: 168),
+            
+            exampleImageView.topAnchor.constraint(equalTo: examplePane.topAnchor, constant: 12),
+            exampleImageView.leadingAnchor.constraint(equalTo: examplePane.leadingAnchor, constant: 12),
+            exampleImageView.trailingAnchor.constraint(equalTo: examplePane.trailingAnchor, constant: -12),
+            exampleImageView.heightAnchor.constraint(equalToConstant: 112),
+            
+            exampleCaptionLabel.topAnchor.constraint(equalTo: exampleImageView.bottomAnchor, constant: 10),
+            exampleCaptionLabel.leadingAnchor.constraint(equalTo: examplePane.leadingAnchor, constant: 12),
+            exampleCaptionLabel.trailingAnchor.constraint(equalTo: examplePane.trailingAnchor, constant: -12),
+            exampleCaptionLabel.bottomAnchor.constraint(equalTo: examplePane.bottomAnchor, constant: -12),
+            
+            yourPhotoCaptionLabel.topAnchor.constraint(equalTo: examplePane.bottomAnchor, constant: 22),
+            yourPhotoCaptionLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            yourPhotoCaptionLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            
+            photoImageView.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
+            photoImageView.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
+            photoImageView.topAnchor.constraint(equalTo: yourPhotoCaptionLabel.bottomAnchor, constant: 8),
+            photoImageView.heightAnchor.constraint(equalToConstant: 280),
+            
+            detectedHeroesLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
+            detectedHeroesLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
+            detectedHeroesLabel.topAnchor.constraint(equalTo: photoImageView.bottomAnchor, constant: 16),
+            
+            takePhotoButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
+            takePhotoButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
+            takePhotoButton.topAnchor.constraint(equalTo: detectedHeroesLabel.bottomAnchor, constant: 24),
             takePhotoButton.heightAnchor.constraint(equalToConstant: 56),
             
-            // Use Photo Button
-            usePhotoButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            usePhotoButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            usePhotoButton.topAnchor.constraint(equalTo: detectedHeroesLabel.bottomAnchor, constant: 32),
+            usePhotoButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
+            usePhotoButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
+            usePhotoButton.topAnchor.constraint(equalTo: detectedHeroesLabel.bottomAnchor, constant: 24),
             usePhotoButton.heightAnchor.constraint(equalToConstant: 56),
             
-            // Retake Photo Button
-            retakePhotoButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            retakePhotoButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
+            retakePhotoButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: inset),
+            retakePhotoButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -inset),
             retakePhotoButton.topAnchor.constraint(equalTo: usePhotoButton.bottomAnchor, constant: 16),
-            retakePhotoButton.heightAnchor.constraint(equalToConstant: 56)
+            retakePhotoButton.heightAnchor.constraint(equalToConstant: 56),
+            retakePhotoButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -36)
         ])
     }
     
@@ -149,37 +276,67 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         navigationController?.navigationBar.applyAppStyle()
         navigationItem.title = "Scan Match"
         
+        introTitleLabel.font = .appHeading4
+        introTitleLabel.textColor = .appPrimaryText
+        tipsLabel.font = .appBodyMedium
+        tipsLabel.textColor = .appSecondaryText
+        yourPhotoCaptionLabel.font = .appBodyLarge
+        yourPhotoCaptionLabel.textColor = .appSecondaryText
+        exampleCaptionLabel.font = .appBodySmall
+        exampleCaptionLabel.textColor = .appTertiaryText
+        
         // Detected heroes label
         detectedHeroesLabel.applyBodyMediumStyle()
         detectedHeroesLabel.textColor = .appSecondaryText
         
-        // Take Photo Button, glassmorphism
-        takePhotoButton.applyGlassmorphismStyle()
-        takePhotoButton.setTitle("Take Photo", for: .normal)
+        takePhotoButton.applySolidPrimaryCTAStyle()
+        takePhotoButton.setTitle("Take or upload photo", for: .normal)
         
-        // Use Photo Button, gradient
-        usePhotoButton.applyGradientStyle()
+        usePhotoButton.applySolidPrimaryCTAStyle()
         
-        // Retake Photo Button, secondary
         retakePhotoButton.applySecondaryStyle()
     }
 
     @objc private func takePhotoTapped() {
-        #if targetEnvironment(simulator)
-        if UIImagePickerController.isSourceTypeAvailable(.photoLibrary) {
-            imagePicker.sourceType = .photoLibrary
-            present(imagePicker, animated: true)
-        } else {
-            showAlert(title: "Unavailable", message: "Photo library is not available.")
+        let canUseCamera = UIImagePickerController.isSourceTypeAvailable(.camera)
+        let canUseLibrary = UIImagePickerController.isSourceTypeAvailable(.photoLibrary)
+        
+        if canUseCamera && canUseLibrary {
+            let sheet = UIAlertController(title: "Add a scoreboard image", message: nil, preferredStyle: .actionSheet)
+            sheet.addAction(UIAlertAction(title: "Use camera", style: .default) { [weak self] _ in
+                self?.presentImagePicker(sourceType: .camera)
+            })
+            sheet.addAction(UIAlertAction(title: "Choose from Library", style: .default) { [weak self] _ in
+                self?.presentImagePicker(sourceType: .photoLibrary)
+            })
+            sheet.addAction(UIAlertAction(title: "Cancel", style: .cancel))
+            
+            // iPad popover anchor
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = takePhotoButton
+                popover.sourceRect = takePhotoButton.bounds
+            }
+            
+            present(sheet, animated: true)
+            return
         }
-        #else
-        if UIImagePickerController.isSourceTypeAvailable(.camera) {
-            imagePicker.sourceType = .camera
-            present(imagePicker, animated: true)
-        } else {
-            showAlert(title: "Camera Unavailable", message: "This device does not support camera capture.")
+        
+        if canUseCamera {
+            presentImagePicker(sourceType: .camera)
+            return
         }
-        #endif
+        
+        if canUseLibrary {
+            presentImagePicker(sourceType: .photoLibrary)
+            return
+        }
+        
+        showAlert(title: "Unavailable", message: "Camera and photo library are not available.")
+    }
+    
+    private func presentImagePicker(sourceType: UIImagePickerController.SourceType) {
+        imagePicker.sourceType = sourceType
+        present(imagePicker, animated: true)
     }
 
     @objc private func usePhotoTapped() {
@@ -196,7 +353,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     @objc private func retakePhotoTapped() {
         // Reset the screen and clear any saved match data
         photoImageView.image = nil
-        detectedHeroesLabel.text = "Take a photo of the scoreboard"
+        detectedHeroesLabel.text = "Tap the button below to take a photo or choose a screenshot, then we’ll scan it."
         MatchStore.shared.clearCurrentMatch()
         takePhotoButton.isHidden = false
         usePhotoButton.isHidden = true
@@ -269,58 +426,129 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         
         print("OBSERVATION COUNT:", observations.count)
         
-        let rows = buildRows(from: observations, in: image)
+        let leftRows = buildRows(from: filteredYourTeamObservations(from: observations), in: image)
         
-        print("OCR ROWS:")
-        for row in rows {
+        print("OCR ROWS (your team):")
+        for row in leftRows {
             print(row.texts, "yellow:", row.yellowScore, "frame:", row.frame)
         }
         
         // Clear any previous in-progress match data before saving new OCR results
         MatchStore.shared.clearCurrentMatch()
         
-        // Parse the selected player row first, then hero separately
-        if let selectedRow = findSelectedPlayerRow(from: rows) {
-            print("SELECTED ROW:", selectedRow.texts)
-            parseSelectedPlayerData(from: selectedRow, using: observations)
+        if let bottomHero = parseBottomBarPlayingHero(from: observations), !bottomHero.isEmpty {
+            MatchStore.shared.currentHero = bottomHero
+            print("PLAYING HERO (bottom stats bar):", bottomHero)
         } else {
-            print("NO SELECTED ROW FOUND")
+            parseHero(from: observations)
+            print("PLAYING HERO (fallback, lower-left OCR):", MatchStore.shared.currentHero)
         }
         
-        parseHero(from: observations)
-        parseEnemyTeam(from: observations)
-        parseFriendlyTeam(from: observations)
+        if let statsRow = findMyStatsRow(from: leftRows, playingHero: MatchStore.shared.currentHero) {
+            print("K/D/A ROW:", statsRow.texts, "yellow:", statsRow.yellowScore)
+            parseSelectedPlayerData(from: statsRow, using: observations)
+        } else {
+            print("NO K/D/A ROW FOUND")
+        }
+        
+        parseEnemyTeam(from: observations, in: image)
+        parseFriendlyTeam(from: filteredYourTeamObservations(from: observations), in: image)
 
-        
-        print("SAVED HERO:", MatchStore.shared.currentHero)
-        print("SAVED USERNAME:", MatchStore.shared.currentUsername)
-        print("SAVED KDA:", MatchStore.shared.currentKills, MatchStore.shared.currentDeaths, MatchStore.shared.currentAssists)
-        
-        let confirmStatsVC = ConfirmMyStatsViewController()
-        navigationController?.pushViewController(confirmStatsVC, animated: true)
+        DispatchQueue.global(qos: .userInitiated).async {
+            HeroPortraitMatcher.shared.refineEnemyTeamWithPortraits(in: image) {
+                HeroPortraitMatcher.shared.debugRunCalibrationOnBundledSamples()
+
+                print("SAVED HERO:", MatchStore.shared.currentHero)
+                print("SAVED USERNAME:", MatchStore.shared.currentUsername)
+                print("SAVED KDA:", MatchStore.shared.currentKills, MatchStore.shared.currentDeaths, MatchStore.shared.currentAssists)
+                
+                let confirmStatsVC = ConfirmMyStatsViewController()
+                self.navigationController?.pushViewController(confirmStatsVC, animated: true)
+            }
+        }
     }
 
+    /// Left team column (your team) — same x-filter as before: `minX <= 0.56`.
     private func buildRows(from observations: [VNRecognizedTextObservation], in image: UIImage) -> [OCRRow] {
-        
-        // Convert Vision observations into OCR items with helpful geometry info
+        buildSideRows(from: observations, in: image, includeMinX: { $0 <= 0.56 }, minMidY: 0.34, maxMidY: 0.86)
+    }
+    
+    /// Right team column (enemy). Allows the same hero name as your character; order follows scoreboard rows top → bottom.
+    private func buildEnemyRows(from observations: [VNRecognizedTextObservation], in image: UIImage) -> [OCRRow] {
+        buildSideRows(from: observations, in: image, includeMinX: { $0 >= 0.56 }, minMidY: 0.34, maxMidY: 0.86)
+    }
+
+    /// If the OCR sees the "ENEMY TEAM" header, use its bottom edge as the top bound for enemy rows.
+    private func enemyTeamHeaderMinY(from observations: [VNRecognizedTextObservation]) -> CGFloat? {
+        struct Hit { let minY: CGFloat; let area: CGFloat }
+        var hits: [Hit] = []
+        for obs in observations {
+            guard let cand = obs.topCandidates(1).first else { continue }
+            let t = cand.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let n = normalizedOCRText(t)
+            guard !n.isEmpty else { continue }
+            // Match "ENEMY TEAM" or close OCR variants (enemyteam, enem yteam, etc).
+            guard n.contains("enemyteam") || (n.contains("enemy") && n.contains("team")) else { continue }
+            let r = obs.boundingBox
+            // Header sits near the top center/right.
+            guard r.midY > 0.72 else { continue }
+            hits.append(Hit(minY: r.minY, area: r.width * r.height))
+        }
+        guard let best = hits.max(by: { $0.area < $1.area }) else { return nil }
+        return best.minY
+    }
+
+    /// If the OCR sees the "YOUR TEAM" header, use its bottom edge as the top bound for friendly rows.
+    private func yourTeamHeaderMinY(from observations: [VNRecognizedTextObservation]) -> CGFloat? {
+        struct Hit { let minY: CGFloat; let area: CGFloat }
+        var hits: [Hit] = []
+        for obs in observations {
+            guard let cand = obs.topCandidates(1).first else { continue }
+            let t = cand.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let n = normalizedOCRText(t)
+            guard !n.isEmpty else { continue }
+            guard n.contains("yourteam") || (n.contains("your") && n.contains("team")) else { continue }
+            let r = obs.boundingBox
+            guard r.midY > 0.72 else { continue }
+            hits.append(Hit(minY: r.minY, area: r.width * r.height))
+        }
+        guard let best = hits.max(by: { $0.area < $1.area }) else { return nil }
+        return best.minY
+    }
+
+    /// Filters OCR to the scoreboard rows only (excludes bottom HUD stats bar).
+    private func filteredYourTeamObservations(from observations: [VNRecognizedTextObservation]) -> [VNRecognizedTextObservation] {
+        let minMidY: CGFloat = 0.34
+        let maxMidY: CGFloat = 0.86
+        let topBound = yourTeamHeaderMinY(from: observations)
+        return observations.filter { obs in
+            let r = obs.boundingBox
+            guard r.midY >= minMidY, r.midY <= maxMidY else { return false }
+            if let topBound {
+                guard r.maxY < topBound else { return false }
+            }
+            return true
+        }
+    }
+    
+    private func buildSideRows(
+        from observations: [VNRecognizedTextObservation],
+        in image: UIImage,
+        includeMinX: (CGFloat) -> Bool,
+        minMidY: CGFloat,
+        maxMidY: CGFloat
+    ) -> [OCRRow] {
         let items: [OCRItem] = observations.compactMap { observation in
             guard let candidate = observation.topCandidates(1).first else { return nil }
             
             let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
             let rect = observation.boundingBox
             
-            // Ignore empty OCR text
             guard !text.isEmpty else { return nil }
-            
-            // Ignore the top header and bottom hero stat strip
-            if rect.midY > 0.86 || rect.midY < 0.28 {
+            if rect.midY > maxMidY || rect.midY < minMidY {
                 return nil
             }
-
-            // Only use the left scoreboard when building player rows
-            if rect.minX > 0.56 {
-                return nil
-            }
+            guard includeMinX(rect.minX) else { return nil }
             
             return OCRItem(
                 text: text,
@@ -340,12 +568,10 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         
         var groupedRows: [[OCRItem]] = []
         
-        // Group nearby OCR items into the same logical scoreboard row
         for item in sorted {
             if let lastIndex = groupedRows.indices.last {
                 let lastRowY = groupedRows[lastIndex].map(\.midY).reduce(0, +) / CGFloat(groupedRows[lastIndex].count)
                 
-                // If the Y value is close enough, treat it as the same row
                 if abs(lastRowY - item.midY) < 0.03 {
                     groupedRows[lastIndex].append(item)
                 } else {
@@ -356,7 +582,6 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
         }
         
-        // Convert grouped items into row models
         return groupedRows.map { row in
             let ordered = row.sorted { $0.minX < $1.minX }
             let texts = ordered.map(\.text)
@@ -373,6 +598,71 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
                 yellowScore: avgYellow
             )
         }
+    }
+    
+    /// First hero name found in row text, left → right; empty if none (leave slot blank).
+    private func heroNameForScoreboardRow(_ row: OCRRow) -> String {
+        for text in row.texts {
+            if let name = bestMatchingHeroName(from: text) {
+                return name
+            }
+        }
+        return ""
+    }
+    
+    /// Post-match bar at the bottom names your hero explicitly (e.g. "ANGELA"); Vision `midY` is low there.
+    private func parseBottomBarPlayingHero(from observations: [VNRecognizedTextObservation]) -> String? {
+        let bottomMidYMax: CGFloat = 0.38
+        let maxX: CGFloat = 0.58
+        
+        struct Hit {
+            let name: String
+            let area: CGFloat
+            let midY: CGFloat
+        }
+        var hits: [Hit] = []
+        
+        for observation in observations {
+            guard let candidate = observation.topCandidates(1).first else { continue }
+            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
+            let rect = observation.boundingBox
+            guard rect.midY < bottomMidYMax, rect.minX < maxX else { continue }
+            guard let hero = bestMatchingHeroName(from: text) else { continue }
+            let area = rect.width * rect.height
+            hits.append(Hit(name: hero, area: area, midY: rect.midY))
+        }
+        
+        guard !hits.isEmpty else { return nil }
+        return hits.max { a, b in
+            if a.area != b.area { return a.area < b.area }
+            return a.midY > b.midY
+        }?.name
+    }
+    
+    /// Prefer the left-column row whose OCR hero matches the bottom-bar hero; then saved username; then yellow highlight.
+    private func findMyStatsRow(from rows: [OCRRow], playingHero: String) -> OCRRow? {
+        let ph = playingHero.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !ph.isEmpty {
+            for row in rows {
+                let hn = heroNameForScoreboardRow(row)
+                if hn.caseInsensitiveCompare(ph) == .orderedSame { return row }
+            }
+            let phNorm = normalizedOCRText(ph)
+            var bestRow: OCRRow?
+            var bestDist = Int.max
+            for row in rows {
+                let hn = heroNameForScoreboardRow(row)
+                guard !hn.isEmpty else { continue }
+                if normalizedOCRText(hn) == phNorm { return row }
+                let d = levenshteinDistance(normalizedOCRText(hn), phNorm)
+                let limit = phNorm.count <= 6 ? 2 : 4
+                guard d <= limit, d < bestDist else { continue }
+                bestDist = d
+                bestRow = row
+            }
+            if let r = bestRow { return r }
+        }
+        return findSelectedPlayerRow(from: rows)
     }
     
     private func findSelectedPlayerRow(from rows: [OCRRow]) -> OCRRow? {
@@ -396,7 +686,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             }
         }
 
-        // Otherwise, guess the selected row by looking for row-like patterns and yellow highlighting
+        // Otherwise guess the selected row (yellow highlight is a weak signal — prefer bottom-bar hero + row match when possible)
 
         let candidateRows = rows.filter { row in
             let rowText = row.texts.joined(separator: " ").lowercased()
@@ -414,7 +704,6 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             print(row.texts, "yellow:", row.yellowScore)
         }
         
-        // The selected row is usually highlighted more strongly in yellow
         return candidateRows.max { $0.yellowScore < $1.yellowScore }
     }
     
@@ -422,6 +711,9 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         // Save the full row text for debugging
         print("SELECTED ROW FRAME:", selectedRow.frame)
         print("SELECTED ROW YELLOW:", selectedRow.yellowScore)
+        
+        let rowJoined = selectedRow.texts.joined(separator: " ")
+        let rowKDA = extractLastKDATripleFromRowText(rowJoined)
         
         // Estimate subregions of the selected row for username and K/D/A columns
         let usernameBox = CGRect(
@@ -465,9 +757,13 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         
         // Save the best OCR results into the shared match store
         let username = bestUsername(from: usernameTexts)
-        let kills = firstInteger(in: killTexts.joined(separator: " "))
-        let deaths = firstInteger(in: deathTexts.joined(separator: " "))
-        let assists = firstInteger(in: assistTexts.joined(separator: " "))
+        let kills = rowKDA?.0 ?? firstInteger(in: killTexts.joined(separator: " "))
+        let deaths = rowKDA?.1 ?? firstInteger(in: deathTexts.joined(separator: " "))
+        let assists = rowKDA?.2 ?? firstInteger(in: assistTexts.joined(separator: " "))
+        
+        if let s = rowKDA {
+            print("K/D/A (triple from row text):", s.0, s.1, s.2)
+        }
         
         MatchStore.shared.currentUsername = username ?? ""
         MatchStore.shared.currentKills = kills ?? 0
@@ -475,75 +771,57 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         MatchStore.shared.currentAssists = assists ?? 0
     }
     
+    /// Fallback when the bottom stats bar does not OCR a hero (scan lower-left for the largest hero-shaped title).
     private func parseHero(from observations: [VNRecognizedTextObservation]) {
         var bestHero = ""
-        
+        var bestArea: CGFloat = 0
         for observation in observations {
             guard let candidate = observation.topCandidates(1).first else { continue }
-            
             let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
             let rect = observation.boundingBox
-            
-            // Hero label is usually in the lower-left panel of the screenshot
-            if rect.midY < 0.28 && rect.minX < 0.30 {
-                if let matchedHero = bestMatchingHeroName(from: text) {
-                    bestHero = matchedHero
-                    break
-                }
+            guard rect.midY < 0.40, rect.minX < 0.45 else { continue }
+            guard let matchedHero = bestMatchingHeroName(from: text) else { continue }
+            let area = rect.width * rect.height
+            if area >= bestArea {
+                bestArea = area
+                bestHero = matchedHero
             }
         }
-        
         MatchStore.shared.currentHero = bestHero
     }
     
-    private func parseEnemyTeam(from observations: [VNRecognizedTextObservation]) {
-        var detectedEnemies: [String] = []
-        
-        for observation in observations {
-            guard let candidate = observation.topCandidates(1).first else { continue }
-            
-            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            let rect = observation.boundingBox
-            
-            // Right side of scoreboard only
-            if rect.minX < 0.56 || rect.midY > 0.86 || rect.midY < 0.28 {
-                continue
-            }
-            
-            if let heroName = bestMatchingHeroName(from: text) {
-                if !detectedEnemies.contains(heroName) {
-                    detectedEnemies.append(heroName)
-                }
-            }
-        }
-        
-        saveEnemyTeam(detectedEnemies)
-        print("DETECTED ENEMY TEAM:", detectedEnemies)
+    /// K/D/A usually appears as three adjacent small ints in the scoreboard row.
+    /// We take the *last* three small ints (rightmost) to avoid grabbing rank/level earlier in the row.
+    private func extractLastKDATripleFromRowText(_ text: String) -> (Int, Int, Int)? {
+        let nums = extractSmallIntegers(from: text)
+        guard nums.count >= 3 else { return nil }
+        let last3 = Array(nums.suffix(3))
+        let k = last3[0], d = last3[1], a = last3[2]
+        guard (0...199).contains(k), (0...199).contains(d), (0...999).contains(a) else { return nil }
+        return (k, d, a)
     }
     
-    private func parseFriendlyTeam(from observations: [VNRecognizedTextObservation]) {
-        var detectedTeam: [String] = []
-        
-        for observation in observations {
-            guard let candidate = observation.topCandidates(1).first else { continue }
-            
-            let text = candidate.string.trimmingCharacters(in: .whitespacesAndNewlines)
-            let rect = observation.boundingBox
-            
-            // Left side of scoreboard only
-            if rect.minX > 0.56 || rect.midY > 0.86 || rect.midY < 0.28 {
-                continue
-            }
-            
-            if let heroName = bestMatchingHeroName(from: text) {
-                if !detectedTeam.contains(heroName) {
-                    detectedTeam.append(heroName)
-                }
-            }
+    private func parseEnemyTeam(from observations: [VNRecognizedTextObservation], in image: UIImage) {
+        let filtered: [VNRecognizedTextObservation]
+        if let headerMinY = enemyTeamHeaderMinY(from: observations) {
+            filtered = observations.filter { $0.boundingBox.maxY < headerMinY }
+        } else {
+            filtered = observations
         }
-        
-        saveFriendlyTeam(detectedTeam)
-        print("DETECTED FRIENDLY TEAM:", detectedTeam)
+        let rows = buildEnemyRows(from: filtered, in: image)
+        let fromRows = rows.prefix(6).map { heroNameForScoreboardRow($0) }
+        let padded = Array(fromRows) + Array(repeating: "", count: max(0, 6 - fromRows.count))
+        let deduped = MatchStore.dedupeEnemyHeroSlotsPreservingOrder(padded)
+        saveEnemyTeam(deduped)
+        print("DETECTED ENEMY TEAM (row order, duplicates cleared):", deduped)
+    }
+    
+    private func parseFriendlyTeam(from observations: [VNRecognizedTextObservation], in image: UIImage) {
+        let rows = buildRows(from: observations, in: image)
+        let fromRows = rows.prefix(6).map { heroNameForScoreboardRow($0) }
+        let padded = Array(fromRows) + Array(repeating: "", count: max(0, 6 - fromRows.count))
+        saveFriendlyTeam(padded)
+        print("DETECTED FRIENDLY TEAM (row order, duplicates allowed):", padded)
     }
     
     private func texts(in region: CGRect, from observations: [VNRecognizedTextObservation]) -> [String] {

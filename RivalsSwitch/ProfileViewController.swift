@@ -26,16 +26,23 @@ class ProfileViewController: UIViewController {
     private let statsHeaderLabel = UILabel()
     private let statsGrid = UIStackView()
     private let matchesStatChip = UIView()
-    private let winRateStatChip = UIView()
-    private let mostPlayedStatChip = UIView()
-    private let lastPlayedStatChip = UIView()
+    private let avgKdaStatChip = UIView()
+    private let swapPicksStatChip = UIView()
+    private let lastHeroStatChip = UIView()
     
-    // Quick Actions
+    private var matchesValueLabel: UILabel?
+    private var avgKdaValueLabel: UILabel?
+    private var swapPicksValueLabel: UILabel?
+    private var lastHeroPortraitView: UIImageView?
+    private var lastHeroNameLabel: UILabel?
+    
+    // Quick Actions (each row is its own card, like separate preference tiles)
     private let quickActionsHeaderLabel = UILabel()
-    private let quickActionsCard = UIView()
-    private let historyButton = UIButton(type: .system)
-    private let exportButton = UIButton(type: .system)
-    private let helpButton = UIButton(type: .system)
+    private let quickActionsStack = UIStackView()
+    private let historyButton = UIButton(type: .custom)
+    private let partyQuickButton = UIButton(type: .custom)
+    private let exportButton = UIButton(type: .custom)
+    private let helpButton = UIButton(type: .custom)
     
     // Preferences
     private let preferencesHeaderLabel = UILabel()
@@ -47,6 +54,29 @@ class ProfileViewController: UIViewController {
     private let hapticsLabel = UILabel()
     private let hapticsToggle = UISwitch()
     
+    /// Messaging tone + pick count (formerly on the More tab); saved when you tap an option.
+    private let recommendationsHeaderLabel = UILabel()
+    private let messagingCard = UIView()
+    private let messagingTitleLabel = UILabel()
+    private let messagingStack = UIStackView()
+    private var messagingOptionButtons: [UIButton] = []
+    private let recommendationCard = UIView()
+    private let recommendationTitleLabel = UILabel()
+    private let recommendationStack = UIStackView()
+    private var recommendationOptionButtons: [UIButton] = []
+    private let toneChoices: [(title: String, subtitle: String)] = [
+        ("Blunt", "Full roast, \"Don't Zazza\" energy — you asked"),
+        ("Neutral", "Straight facts, normal wording"),
+        ("Chill", "Softer, encouraging phrasing")
+    ]
+    private let styleChoices: [(title: String, subtitle: String)] = [
+        ("Critical", "Only urgent / strong swap suggestions"),
+        ("Normal", "Balanced variety of picks"),
+        ("Max", "Always show three top picks")
+    ]
+    private var selectedToneIndex = 1
+    private var selectedStyleIndex = 1
+    
     // Account
     private let accountHeaderLabel = UILabel()
     private let accountCard = UIView()
@@ -55,13 +85,21 @@ class ProfileViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         setupUI()
+        loadRecommendationPreferencesFromDefaults()
+        refreshRecommendationOptionUI()
         setupStyling()
+        loadUserData()
+    }
+    
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
         loadUserData()
     }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         gradientLayer?.frame = view.bounds
+        updateScrollViewTabBarAvoidance(scrollView)
     }
     
     private func setupUI() {
@@ -83,17 +121,18 @@ class ProfileViewController: UIViewController {
         contentView.translatesAutoresizingMaskIntoConstraints = false
         view.addSubview(scrollView)
         scrollView.addSubview(contentView)
+        scrollView.alwaysBounceVertical = true
         
         NSLayoutConstraint.activate([
             scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
             scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
-            scrollView.bottomAnchor.constraint(equalTo: view.bottomAnchor),
-            contentView.topAnchor.constraint(equalTo: scrollView.topAnchor),
-            contentView.leadingAnchor.constraint(equalTo: scrollView.leadingAnchor),
-            contentView.trailingAnchor.constraint(equalTo: scrollView.trailingAnchor),
-            contentView.bottomAnchor.constraint(equalTo: scrollView.bottomAnchor),
-            contentView.widthAnchor.constraint(equalTo: scrollView.widthAnchor)
+            scrollView.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
         ])
         
         // 1. Compact Header Card
@@ -105,10 +144,13 @@ class ProfileViewController: UIViewController {
         // 3. Quick Actions
         setupQuickActions()
         
-        // 4. Preferences
+        // 4. Recommendations (tone + picks — persisted on selection)
+        setupRecommendationPreferences()
+        
+        // 5. Preferences
         setupPreferences()
         
-        // 5. Account / Logout
+        // 6. Account / Logout
         setupAccount()
         
         // Layout all sections
@@ -175,9 +217,9 @@ class ProfileViewController: UIViewController {
         matchesStatChip.applyCardStyle()
         row1.addArrangedSubview(matchesStatChip)
         
-        winRateStatChip.translatesAutoresizingMaskIntoConstraints = false
-        winRateStatChip.applyCardStyle()
-        row1.addArrangedSubview(winRateStatChip)
+        avgKdaStatChip.translatesAutoresizingMaskIntoConstraints = false
+        avgKdaStatChip.applyCardStyle()
+        row1.addArrangedSubview(avgKdaStatChip)
         
         statsGrid.addArrangedSubview(row1)
         
@@ -187,24 +229,24 @@ class ProfileViewController: UIViewController {
         row2.spacing = 12
         row2.distribution = .fillEqually
         
-        mostPlayedStatChip.translatesAutoresizingMaskIntoConstraints = false
-        mostPlayedStatChip.applyCardStyle()
-        row2.addArrangedSubview(mostPlayedStatChip)
+        swapPicksStatChip.translatesAutoresizingMaskIntoConstraints = false
+        swapPicksStatChip.applyCardStyle()
+        row2.addArrangedSubview(swapPicksStatChip)
         
-        lastPlayedStatChip.translatesAutoresizingMaskIntoConstraints = false
-        lastPlayedStatChip.applyCardStyle()
-        row2.addArrangedSubview(lastPlayedStatChip)
+        lastHeroStatChip.translatesAutoresizingMaskIntoConstraints = false
+        lastHeroStatChip.applyCardStyle()
+        row2.addArrangedSubview(lastHeroStatChip)
         
         statsGrid.addArrangedSubview(row2)
         
-        // Add labels to each chip
-        addStatChipLabels(to: matchesStatChip, title: "Matches", value: "0")
-        addStatChipLabels(to: winRateStatChip, title: "Win Rate", value: "—")
-        addStatChipLabels(to: mostPlayedStatChip, title: "Most Played", value: "—")
-        addStatChipLabels(to: lastPlayedStatChip, title: "Last Played", value: "—")
+        matchesValueLabel = addStatChipLabels(to: matchesStatChip, title: "Matches", value: "0")
+        avgKdaValueLabel = addStatChipLabels(to: avgKdaStatChip, title: "Avg K/D/A", value: "—")
+        swapPicksValueLabel = addStatChipLabels(to: swapPicksStatChip, title: "Switch rate", value: "—")
+        addLastHeroStatChip(to: lastHeroStatChip)
     }
     
-    private func addStatChipLabels(to chip: UIView, title: String, value: String) {
+    @discardableResult
+    private func addStatChipLabels(to chip: UIView, title: String, value: String) -> UILabel {
         let stack = UIStackView()
         stack.translatesAutoresizingMaskIntoConstraints = false
         stack.axis = .vertical
@@ -216,12 +258,16 @@ class ProfileViewController: UIViewController {
         valueLabel.font = .appHeading3
         valueLabel.textColor = .appPrimaryAccent
         valueLabel.textAlignment = .center
+        valueLabel.adjustsFontSizeToFitWidth = true
+        valueLabel.minimumScaleFactor = 0.75
+        valueLabel.numberOfLines = 2
         
         let titleLabel = UILabel()
         titleLabel.text = title
         titleLabel.font = .appBodySmall
         titleLabel.textColor = .appSecondaryText
         titleLabel.textAlignment = .center
+        titleLabel.numberOfLines = 2
         
         stack.addArrangedSubview(valueLabel)
         stack.addArrangedSubview(titleLabel)
@@ -233,6 +279,50 @@ class ProfileViewController: UIViewController {
             stack.leadingAnchor.constraint(greaterThanOrEqualTo: chip.leadingAnchor, constant: 8),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: chip.trailingAnchor, constant: -8)
         ])
+        return valueLabel
+    }
+    
+    private func addLastHeroStatChip(to chip: UIView) {
+        let portrait = UIImageView()
+        portrait.translatesAutoresizingMaskIntoConstraints = false
+        portrait.contentMode = .scaleAspectFit
+        portrait.layer.cornerRadius = 8
+        portrait.clipsToBounds = true
+        portrait.image = UIImage(systemName: "person.fill")
+        portrait.tintColor = .appTertiaryText
+        
+        let nameLabel = UILabel()
+        nameLabel.translatesAutoresizingMaskIntoConstraints = false
+        nameLabel.font = .systemFont(ofSize: 12, weight: .semibold)
+        nameLabel.textColor = .appPrimaryAccent
+        nameLabel.textAlignment = .center
+        nameLabel.numberOfLines = 2
+        nameLabel.text = "—"
+        
+        let caption = UILabel()
+        caption.translatesAutoresizingMaskIntoConstraints = false
+        caption.text = "Last match"
+        caption.font = .appBodySmall
+        caption.textColor = .appSecondaryText
+        caption.textAlignment = .center
+        
+        let stack = UIStackView(arrangedSubviews: [portrait, nameLabel, caption])
+        stack.translatesAutoresizingMaskIntoConstraints = false
+        stack.axis = .vertical
+        stack.spacing = 4
+        stack.alignment = .center
+        
+        chip.addSubview(stack)
+        NSLayoutConstraint.activate([
+            portrait.widthAnchor.constraint(equalToConstant: 40),
+            portrait.heightAnchor.constraint(equalToConstant: 40),
+            stack.centerXAnchor.constraint(equalTo: chip.centerXAnchor),
+            stack.centerYAnchor.constraint(equalTo: chip.centerYAnchor),
+            stack.leadingAnchor.constraint(greaterThanOrEqualTo: chip.leadingAnchor, constant: 6),
+            stack.trailingAnchor.constraint(lessThanOrEqualTo: chip.trailingAnchor, constant: -6)
+        ])
+        lastHeroPortraitView = portrait
+        lastHeroNameLabel = nameLabel
     }
     
     private func setupQuickActions() {
@@ -240,80 +330,183 @@ class ProfileViewController: UIViewController {
         quickActionsHeaderLabel.text = "Quick actions"
         contentView.addSubview(quickActionsHeaderLabel)
         
-        quickActionsCard.translatesAutoresizingMaskIntoConstraints = false
-        quickActionsCard.applyCardStyle()
-        contentView.addSubview(quickActionsCard)
+        quickActionsStack.translatesAutoresizingMaskIntoConstraints = false
+        quickActionsStack.axis = .vertical
+        quickActionsStack.spacing = 12
+        contentView.addSubview(quickActionsStack)
         
-        // Stack for action buttons
-        let actionsStack = UIStackView()
-        actionsStack.translatesAutoresizingMaskIntoConstraints = false
-        actionsStack.axis = .vertical
-        actionsStack.spacing = 0
-        quickActionsCard.addSubview(actionsStack)
+        configureProfileQuickAction(historyButton, title: "View Match History", symbol: "clock.arrow.circlepath", action: #selector(viewHistoryTapped))
+        configureProfileQuickAction(partyQuickButton, title: "Party", symbol: "person.2.fill", action: #selector(openPartyTabTapped))
+        configureProfileQuickAction(exportButton, title: "Export / Share", symbol: "square.and.arrow.up", action: #selector(exportTapped))
+        configureProfileQuickAction(helpButton, title: "Help / How it works", symbol: "questionmark.circle", action: #selector(helpTapped))
         
-        // View History
-        historyButton.translatesAutoresizingMaskIntoConstraints = false
-        historyButton.contentHorizontalAlignment = .leading
-        historyButton.setTitle("  View Match History", for: .normal)
-        historyButton.addTarget(self, action: #selector(viewHistoryTapped), for: .touchUpInside)
+        for button in [historyButton, partyQuickButton, exportButton, helpButton] {
+            let card = UIView()
+            card.translatesAutoresizingMaskIntoConstraints = false
+            card.applyCardStyle()
+            card.addSubview(button)
+            quickActionsStack.addArrangedSubview(card)
+            NSLayoutConstraint.activate([
+                button.topAnchor.constraint(equalTo: card.topAnchor),
+                button.leadingAnchor.constraint(equalTo: card.leadingAnchor),
+                button.trailingAnchor.constraint(equalTo: card.trailingAnchor),
+                button.bottomAnchor.constraint(equalTo: card.bottomAnchor),
+                button.heightAnchor.constraint(greaterThanOrEqualToConstant: 52)
+            ])
+        }
+    }
+    
+    private func configureProfileQuickAction(_ button: UIButton, title: String, symbol: String, action: Selector) {
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.addTarget(self, action: action, for: .touchUpInside)
         if #available(iOS 15.0, *) {
             var config = UIButton.Configuration.plain()
-            config.image = UIImage(systemName: "clock.arrow.circlepath")
+            config.title = title
+            config.image = UIImage(systemName: symbol)
             config.imagePlacement = .leading
             config.imagePadding = 12
             config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
-            historyButton.configuration = config
+            config.baseForegroundColor = .appPrimaryText
+            config.titleAlignment = .leading
+            config.background.backgroundColor = .clear
+            button.configuration = config
+        } else {
+            button.contentHorizontalAlignment = .leading
+            button.setImage(UIImage(systemName: symbol), for: .normal)
+            button.setTitle("  \(title)", for: .normal)
+            button.setTitleColor(.appPrimaryText, for: .normal)
+            button.titleLabel?.font = .appBodyLarge
+            button.tintColor = .appPrimaryAccent
         }
-        actionsStack.addArrangedSubview(historyButton)
+    }
+    
+    private func setupRecommendationPreferences() {
+        recommendationsHeaderLabel.translatesAutoresizingMaskIntoConstraints = false
+        recommendationsHeaderLabel.text = "Recommendations"
+        contentView.addSubview(recommendationsHeaderLabel)
         
-        // Divider 1
-        let divider1 = createDivider()
-        actionsStack.addArrangedSubview(divider1)
+        messagingCard.translatesAutoresizingMaskIntoConstraints = false
+        messagingCard.applyCardStyle()
+        contentView.addSubview(messagingCard)
         
-        // Export / Share
-        exportButton.translatesAutoresizingMaskIntoConstraints = false
-        exportButton.contentHorizontalAlignment = .leading
-        exportButton.setTitle("  Export / Share", for: .normal)
-        exportButton.addTarget(self, action: #selector(exportTapped), for: .touchUpInside)
+        messagingTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        messagingTitleLabel.text = "Messaging tone"
+        messagingCard.addSubview(messagingTitleLabel)
+        
+        messagingStack.axis = .vertical
+        messagingStack.spacing = 10
+        messagingStack.translatesAutoresizingMaskIntoConstraints = false
+        messagingCard.addSubview(messagingStack)
+        
+        messagingOptionButtons = toneChoices.enumerated().map { i, choice in
+            let b = makeRecommendationChoiceButton(title: choice.title, subtitle: choice.subtitle)
+            b.tag = i
+            b.addTarget(self, action: #selector(recommendationToneTapped(_:)), for: .touchUpInside)
+            messagingStack.addArrangedSubview(b)
+            return b
+        }
+        
+        recommendationCard.translatesAutoresizingMaskIntoConstraints = false
+        recommendationCard.applyCardStyle()
+        contentView.addSubview(recommendationCard)
+        
+        recommendationTitleLabel.translatesAutoresizingMaskIntoConstraints = false
+        recommendationTitleLabel.text = "How many picks"
+        recommendationCard.addSubview(recommendationTitleLabel)
+        
+        recommendationStack.axis = .vertical
+        recommendationStack.spacing = 10
+        recommendationStack.translatesAutoresizingMaskIntoConstraints = false
+        recommendationCard.addSubview(recommendationStack)
+        
+        recommendationOptionButtons = styleChoices.enumerated().map { i, choice in
+            let b = makeRecommendationChoiceButton(title: choice.title, subtitle: choice.subtitle)
+            b.tag = i
+            b.addTarget(self, action: #selector(recommendationStyleTapped(_:)), for: .touchUpInside)
+            recommendationStack.addArrangedSubview(b)
+            return b
+        }
+        
+        messagingOptionButtons.forEach { $0.heightAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true }
+        recommendationOptionButtons.forEach { $0.heightAnchor.constraint(greaterThanOrEqualToConstant: 56).isActive = true }
+    }
+    
+    private func loadRecommendationPreferencesFromDefaults() {
+        let t = UserDefaults.standard.integer(forKey: AppPreferenceStore.Keys.messagingTone)
+        if t >= 0 && t < toneChoices.count { selectedToneIndex = t }
+        let s = UserDefaults.standard.integer(forKey: AppPreferenceStore.Keys.recommendationStyle)
+        if s >= 0 && s < styleChoices.count { selectedStyleIndex = s }
+    }
+    
+    private func makeRecommendationChoiceButton(title: String, subtitle: String) -> UIButton {
+        let b = UIButton(type: .system)
+        b.translatesAutoresizingMaskIntoConstraints = false
+        b.layer.cornerRadius = 12
+        b.clipsToBounds = true
+        b.contentHorizontalAlignment = .leading
         if #available(iOS 15.0, *) {
             var config = UIButton.Configuration.plain()
-            config.image = UIImage(systemName: "square.and.arrow.up")
-            config.imagePlacement = .leading
-            config.imagePadding = 12
-            config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
-            exportButton.configuration = config
+            var titleAttr = AttributeContainer()
+            titleAttr.foregroundColor = UIColor.appPrimaryText
+            var subAttr = AttributeContainer()
+            subAttr.foregroundColor = UIColor.appTertiaryText
+            config.attributedTitle = AttributedString(title, attributes: titleAttr)
+            config.attributedSubtitle = AttributedString(subtitle, attributes: subAttr)
+            config.titleAlignment = .leading
+            config.contentInsets = NSDirectionalEdgeInsets(top: 12, leading: 14, bottom: 12, trailing: 14)
+            config.titleLineBreakMode = .byWordWrapping
+            config.subtitleLineBreakMode = .byWordWrapping
+            b.configuration = config
+        } else {
+            b.setTitle("\(title)\n\(subtitle)", for: .normal)
+            b.titleLabel?.numberOfLines = 0
         }
-        actionsStack.addArrangedSubview(exportButton)
-        
-        // Divider 2
-        let divider2 = createDivider()
-        actionsStack.addArrangedSubview(divider2)
-        
-        // Help
-        helpButton.translatesAutoresizingMaskIntoConstraints = false
-        helpButton.contentHorizontalAlignment = .leading
-        helpButton.setTitle("  Help / How it works", for: .normal)
-        helpButton.addTarget(self, action: #selector(helpTapped), for: .touchUpInside)
-        if #available(iOS 15.0, *) {
-            var config = UIButton.Configuration.plain()
-            config.image = UIImage(systemName: "questionmark.circle")
-            config.imagePlacement = .leading
-            config.imagePadding = 12
-            config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
-            helpButton.configuration = config
+        return b
+    }
+    
+    private func refreshRecommendationOptionUI() {
+        for (i, b) in messagingOptionButtons.enumerated() {
+            applyRecommendationSelectedAppearance(b, selected: i == selectedToneIndex)
         }
-        actionsStack.addArrangedSubview(helpButton)
-        
-        NSLayoutConstraint.activate([
-            actionsStack.topAnchor.constraint(equalTo: quickActionsCard.topAnchor),
-            actionsStack.leadingAnchor.constraint(equalTo: quickActionsCard.leadingAnchor),
-            actionsStack.trailingAnchor.constraint(equalTo: quickActionsCard.trailingAnchor),
-            actionsStack.bottomAnchor.constraint(equalTo: quickActionsCard.bottomAnchor),
-            
-            historyButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
-            exportButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 48),
-            helpButton.heightAnchor.constraint(greaterThanOrEqualToConstant: 48)
-        ])
+        for (i, b) in recommendationOptionButtons.enumerated() {
+            applyRecommendationSelectedAppearance(b, selected: i == selectedStyleIndex)
+        }
+    }
+    
+    private func applyRecommendationSelectedAppearance(_ button: UIButton, selected: Bool) {
+        if selected {
+            button.layer.borderWidth = 2
+            button.layer.borderColor = UIColor.appPrimaryAccent.cgColor
+            if #available(iOS 15.0, *) {
+                var config = button.configuration ?? .plain()
+                config.background.backgroundColor = UIColor.appPrimaryAccent.withAlphaComponent(0.15)
+                button.configuration = config
+            } else {
+                button.backgroundColor = UIColor.appPrimaryAccent.withAlphaComponent(0.15)
+            }
+        } else {
+            button.layer.borderWidth = 1
+            button.layer.borderColor = UIColor.appBorderColor.cgColor
+            if #available(iOS 15.0, *) {
+                var config = button.configuration ?? .plain()
+                config.background.backgroundColor = UIColor.white.withAlphaComponent(0.07)
+                button.configuration = config
+            } else {
+                button.backgroundColor = UIColor.white.withAlphaComponent(0.07)
+            }
+        }
+    }
+    
+    @objc private func recommendationToneTapped(_ sender: UIButton) {
+        selectedToneIndex = sender.tag
+        refreshRecommendationOptionUI()
+        UserDefaults.standard.set(selectedToneIndex, forKey: AppPreferenceStore.Keys.messagingTone)
+    }
+    
+    @objc private func recommendationStyleTapped(_ sender: UIButton) {
+        selectedStyleIndex = sender.tag
+        refreshRecommendationOptionUI()
+        UserDefaults.standard.set(selectedStyleIndex, forKey: AppPreferenceStore.Keys.recommendationStyle)
     }
     
     private func setupPreferences() {
@@ -398,18 +591,13 @@ class ProfileViewController: UIViewController {
         // Logout button, now smaller and within a card
         logoutButton.translatesAutoresizingMaskIntoConstraints = false
         logoutButton.contentHorizontalAlignment = .leading
-        logoutButton.setTitle("  Logout", for: .normal)
-        logoutButton.setTitleColor(.appErrorColor, for: .normal)
+        logoutButton.setTitle("Logout", for: .normal)
+        logoutButton.setImage(UIImage(systemName: "rectangle.portrait.and.arrow.right"), for: .normal)
+        logoutButton.semanticContentAttribute = .forceLeftToRight
+        logoutButton.imageEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 10)
+        logoutButton.titleEdgeInsets = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: -10)
         logoutButton.addTarget(self, action: #selector(logoutTapped), for: .touchUpInside)
-        if #available(iOS 15.0, *) {
-            var config = UIButton.Configuration.plain()
-            config.image = UIImage(systemName: "rectangle.portrait.and.arrow.right")
-            config.imagePlacement = .leading
-            config.imagePadding = 12
-            config.contentInsets = NSDirectionalEdgeInsets(top: 14, leading: 16, bottom: 14, trailing: 16)
-            config.baseForegroundColor = .appErrorColor
-            logoutButton.configuration = config
-        }
+        logoutButton.applyDestructiveSecondaryStyle()
         accountCard.addSubview(logoutButton)
         
         NSLayoutConstraint.activate([
@@ -453,19 +641,49 @@ class ProfileViewController: UIViewController {
             statsGrid.topAnchor.constraint(equalTo: statsHeaderLabel.bottomAnchor, constant: 12),
             statsGrid.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             statsGrid.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
-            statsGrid.heightAnchor.constraint(equalToConstant: 168), // 2 rows * 78 + 12 spacing
+            statsGrid.heightAnchor.constraint(equalToConstant: 184), // 2 rows + last-hero portrait
             
             // Quick Actions Header
             quickActionsHeaderLabel.topAnchor.constraint(equalTo: statsGrid.bottomAnchor, constant: 28),
             quickActionsHeaderLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             
-            // Quick Actions Card
-            quickActionsCard.topAnchor.constraint(equalTo: quickActionsHeaderLabel.bottomAnchor, constant: 12),
-            quickActionsCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
-            quickActionsCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            // Quick Actions (stack of separate cards)
+            quickActionsStack.topAnchor.constraint(equalTo: quickActionsHeaderLabel.bottomAnchor, constant: 12),
+            quickActionsStack.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            quickActionsStack.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            
+            // Recommendations
+            recommendationsHeaderLabel.topAnchor.constraint(equalTo: quickActionsStack.bottomAnchor, constant: 28),
+            recommendationsHeaderLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            
+            messagingCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            messagingCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            messagingCard.topAnchor.constraint(equalTo: recommendationsHeaderLabel.bottomAnchor, constant: 12),
+            
+            messagingTitleLabel.topAnchor.constraint(equalTo: messagingCard.topAnchor, constant: 18),
+            messagingTitleLabel.leadingAnchor.constraint(equalTo: messagingCard.leadingAnchor, constant: 18),
+            messagingTitleLabel.trailingAnchor.constraint(equalTo: messagingCard.trailingAnchor, constant: -18),
+            
+            messagingStack.topAnchor.constraint(equalTo: messagingTitleLabel.bottomAnchor, constant: 14),
+            messagingStack.leadingAnchor.constraint(equalTo: messagingCard.leadingAnchor, constant: 14),
+            messagingStack.trailingAnchor.constraint(equalTo: messagingCard.trailingAnchor, constant: -14),
+            messagingStack.bottomAnchor.constraint(equalTo: messagingCard.bottomAnchor, constant: -16),
+            
+            recommendationCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
+            recommendationCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
+            recommendationCard.topAnchor.constraint(equalTo: messagingCard.bottomAnchor, constant: 16),
+            
+            recommendationTitleLabel.topAnchor.constraint(equalTo: recommendationCard.topAnchor, constant: 18),
+            recommendationTitleLabel.leadingAnchor.constraint(equalTo: recommendationCard.leadingAnchor, constant: 18),
+            recommendationTitleLabel.trailingAnchor.constraint(equalTo: recommendationCard.trailingAnchor, constant: -18),
+            
+            recommendationStack.topAnchor.constraint(equalTo: recommendationTitleLabel.bottomAnchor, constant: 14),
+            recommendationStack.leadingAnchor.constraint(equalTo: recommendationCard.leadingAnchor, constant: 14),
+            recommendationStack.trailingAnchor.constraint(equalTo: recommendationCard.trailingAnchor, constant: -14),
+            recommendationStack.bottomAnchor.constraint(equalTo: recommendationCard.bottomAnchor, constant: -16),
             
             // Preferences Header
-            preferencesHeaderLabel.topAnchor.constraint(equalTo: quickActionsCard.bottomAnchor, constant: 28),
+            preferencesHeaderLabel.topAnchor.constraint(equalTo: recommendationCard.bottomAnchor, constant: 28),
             preferencesHeaderLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             
             // Preferences Card
@@ -481,7 +699,7 @@ class ProfileViewController: UIViewController {
             accountCard.topAnchor.constraint(equalTo: accountHeaderLabel.bottomAnchor, constant: 12),
             accountCard.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 24),
             accountCard.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -24),
-            accountCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
+            accountCard.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -48)
         ])
     }
     
@@ -506,20 +724,23 @@ class ProfileViewController: UIViewController {
         subtitleLabel.textColor = .appSecondaryText
         
         // Section headers
-        [statsHeaderLabel, quickActionsHeaderLabel, preferencesHeaderLabel, accountHeaderLabel].forEach { label in
+        [statsHeaderLabel, quickActionsHeaderLabel, recommendationsHeaderLabel, preferencesHeaderLabel, accountHeaderLabel].forEach { label in
             label.font = .appBodyLarge
             label.textColor = .appSecondaryText
         }
         
-        // Quick action buttons
-        historyButton.tintColor = .appPrimaryText
-        historyButton.titleLabel?.font = .appBodyLarge
+        messagingTitleLabel.font = .appHeading4
+        messagingTitleLabel.textColor = .appPrimaryText
+        recommendationTitleLabel.font = .appHeading4
+        recommendationTitleLabel.textColor = .appPrimaryText
         
-        exportButton.tintColor = .appPrimaryText
-        exportButton.titleLabel?.font = .appBodyLarge
-        
-        helpButton.tintColor = .appPrimaryText
-        helpButton.titleLabel?.font = .appBodyLarge
+        if #available(iOS 15.0, *) {
+            [historyButton, partyQuickButton, exportButton, helpButton].forEach { b in
+                var config = b.configuration ?? .plain()
+                config.background.backgroundColor = .clear
+                b.configuration = config
+            }
+        }
         
         // Preference labels
         autoSaveLabel.font = .appBodyLarge
@@ -549,11 +770,17 @@ class ProfileViewController: UIViewController {
             avatarImageView.contentMode = .scaleAspectFit
         }
         
-        // Update match count in stats grid
-        let matchCount = MatchStore.shared.loadMatches().count
-        if let matchesChip = matchesStatChip.subviews.first as? UIStackView,
-           let valueLabel = matchesChip.arrangedSubviews.first as? UILabel {
-            valueLabel.text = "\(matchCount)"
+        let stats = MatchStore.shared.profileHistoryStatsForDisplay()
+        matchesValueLabel?.text = "\(stats.matchCount)"
+        avgKdaValueLabel?.text = stats.avgKDALine
+        swapPicksValueLabel?.text = stats.swapPickPercentLine
+        lastHeroNameLabel?.text = stats.lastHeroName
+        if let summary = stats.lastHeroSummary, let thumb = MatchSummaryThumbnail.thumbnailImage(for: summary) {
+            lastHeroPortraitView?.image = thumb
+            lastHeroPortraitView?.tintColor = nil
+        } else {
+            lastHeroPortraitView?.image = UIImage(systemName: "person.fill")
+            lastHeroPortraitView?.tintColor = .appTertiaryText
         }
     }
     
@@ -643,11 +870,15 @@ class ProfileViewController: UIViewController {
     }
     
     @objc private func viewHistoryTapped() {
-        // Navigate to History tab
-        if let tabBar = self.tabBarController {
-            // Assuming History is at index 1
-            tabBar.selectedIndex = 1
+        if selectTabBarRoot(matching: HistoryViewController.self) {
+            return
         }
+        let historyVC = HistoryViewController()
+        navigationController?.pushViewController(historyVC, animated: true)
+    }
+    
+    @objc private func openPartyTabTapped() {
+        openPartyScreen()
     }
     
     @objc private func exportTapped() {
@@ -661,9 +892,16 @@ class ProfileViewController: UIViewController {
     }
     
     @objc private func helpTapped() {
+        let message = """
+        RivalsSwitch is a companion for Marvel Rivals — it helps you read the scoreboard, think about swaps, and coordinate with Party. It does not teach how to play the game itself.
+
+        Flow: Home → Match → scan or pick a scoreboard screenshot → confirm stats → get suggestions → History saves your runs.
+
+        Scan tip: use the Tab scoreboard when hero portraits are fully visible. Avoid shots taken while you’re respawning — countdown numbers over portraits often break text recognition.
+        """
         let alert = UIAlertController(
-            title: "How it works",
-            message: "1. Tap 'Start New Match' on the home screen\n2. Scan your scoreboard photo\n3. Confirm your stats\n4. Get counter-pick recommendations\n5. Review your match history",
+            title: "How to use RivalsSwitch",
+            message: message,
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "Got it", style: .default))

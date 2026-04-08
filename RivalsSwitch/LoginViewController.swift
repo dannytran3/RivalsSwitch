@@ -9,17 +9,18 @@ import UIKit
 import AVFoundation
 
 // sign-in code for returning users
-class LoginViewController: UIViewController {
+class LoginViewController: UIViewController, UITextFieldDelegate {
     
     // Main UI elements
+    private let scrollView = UIScrollView()
+    private let contentView = UIView()
     private let logoImageView = UIImageView()
     private let titleLabel = UILabel()
     private let usernameLabel = UILabel()
     private let passwordLabel = UILabel()
     private let usernameTextField = UITextField()
     private let passwordTextField = UITextField()
-    private let forgotPasswordButton = UIButton(type: .system)
-    private let loginButton = UIButton(type: .system)
+    private let loginButton = UIButton(type: .custom)
     private let signUpLinkButton = UIButton(type: .system)
     private var gradientLayer: CAGradientLayer?
     
@@ -32,6 +33,8 @@ class LoginViewController: UIViewController {
     private var glowLayerBottomLeft: CAGradientLayer?
     
     private var logoAspectConstraint: NSLayoutConstraint?
+    
+    private weak var activeTextField: UITextField?
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -45,6 +48,11 @@ class LoginViewController: UIViewController {
             self.view.window?.rootViewController?.present(nav, animated: false)
         }
     }
+
+    // Keep auth screens stable; allow rotation elsewhere.
+    override var supportedInterfaceOrientations: UIInterfaceOrientationMask { .portrait }
+    override var shouldAutorotate: Bool { false }
+    override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
@@ -64,12 +72,38 @@ class LoginViewController: UIViewController {
             glow2.frame = CGRect(x: -size * 0.35, y: view.bounds.maxY - size * 0.7, width: size, height: size)
         }
         
-        // Refresh gradient styling inside the login button
-        loginButton.updateGradientFrame()
     }
     
     private func setupUI() {
         view.backgroundColor = .appPrimaryBackground
+        
+        let tap = UITapGestureRecognizer(target: self, action: #selector(backgroundTapped))
+        tap.cancelsTouchesInView = false
+        view.addGestureRecognizer(tap)
+        
+        // Scroll container (standard iOS keyboard-safe approach)
+        scrollView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.keyboardDismissMode = .interactive
+        scrollView.alwaysBounceVertical = true
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.contentInsetAdjustmentBehavior = .never
+        view.addSubview(scrollView)
+        
+        contentView.translatesAutoresizingMaskIntoConstraints = false
+        scrollView.addSubview(contentView)
+        
+        NSLayoutConstraint.activate([
+            scrollView.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scrollView.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+            scrollView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor),
+            scrollView.bottomAnchor.constraint(equalTo: view.keyboardLayoutGuide.topAnchor),
+            
+            contentView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            contentView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            contentView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            contentView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            contentView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor)
+        ])
         
         // Gradient Background
         let gradient = CAGradientLayer()
@@ -153,7 +187,7 @@ class LoginViewController: UIViewController {
         if let logoImage = UIImage(named: "Logo") {
             logoImageView.image = logoImage
         }
-        view.addSubview(logoImageView)
+        contentView.addSubview(logoImageView)
         
         // Aspect ratio based on image
         if let img = logoImageView.image {
@@ -165,90 +199,84 @@ class LoginViewController: UIViewController {
         // Title Label
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.text = "Sign in to RivalsSwitch"
+        titleLabel.numberOfLines = 0
         titleLabel.textAlignment = .center
-        view.addSubview(titleLabel)
+        contentView.addSubview(titleLabel)
         
         // Field Labels
         usernameLabel.translatesAutoresizingMaskIntoConstraints = false
         usernameLabel.text = "Username"
-        view.addSubview(usernameLabel)
+        contentView.addSubview(usernameLabel)
         
         passwordLabel.translatesAutoresizingMaskIntoConstraints = false
         passwordLabel.text = "Password"
-        view.addSubview(passwordLabel)
+        contentView.addSubview(passwordLabel)
         
         // Username Text Field
         usernameTextField.translatesAutoresizingMaskIntoConstraints = false
         usernameTextField.placeholder = "Enter your username"
         usernameTextField.autocapitalizationType = .none
         usernameTextField.autocorrectionType = .no
-        view.addSubview(usernameTextField)
+        usernameTextField.returnKeyType = .next
+        usernameTextField.delegate = self
+        contentView.addSubview(usernameTextField)
         
         // Password Text Field
         passwordTextField.translatesAutoresizingMaskIntoConstraints = false
         passwordTextField.placeholder = "Enter your password"
         passwordTextField.isSecureTextEntry = true
-        view.addSubview(passwordTextField)
-        
-        // Forgot Password Button
-        forgotPasswordButton.translatesAutoresizingMaskIntoConstraints = false
-        forgotPasswordButton.setTitle("Forgot Password?", for: .normal)
-        forgotPasswordButton.contentHorizontalAlignment = .right
-        view.addSubview(forgotPasswordButton)
+        passwordTextField.returnKeyType = .done
+        passwordTextField.delegate = self
+        contentView.addSubview(passwordTextField)
         
         // Login Button
         loginButton.translatesAutoresizingMaskIntoConstraints = false
         loginButton.setTitle("Login", for: .normal)
         loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
-        view.addSubview(loginButton)
+        contentView.addSubview(loginButton)
         
         // Sign Up Link
         signUpLinkButton.translatesAutoresizingMaskIntoConstraints = false
         signUpLinkButton.setTitle("Sign up", for: .normal)
         signUpLinkButton.contentHorizontalAlignment = .right
         signUpLinkButton.addTarget(self, action: #selector(signUpTapped), for: .touchUpInside)
-        view.addSubview(signUpLinkButton)
+        contentView.addSubview(signUpLinkButton)
         
-        // Constraints: same lower-half, bottom-anchored layout as Landing (logo ~same position)
+        let side: CGFloat = 28
         NSLayoutConstraint.activate([
-            logoImageView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            logoImageView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.9),
-            logoImageView.bottomAnchor.constraint(equalTo: titleLabel.topAnchor, constant: -16),
-            titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            titleLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            titleLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            usernameLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            usernameLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            usernameLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 24),
-            usernameTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            usernameTextField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            usernameTextField.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 8),
-            usernameTextField.heightAnchor.constraint(equalToConstant: 56),
-            passwordLabel.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            passwordLabel.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            passwordLabel.topAnchor.constraint(equalTo: usernameTextField.bottomAnchor, constant: 16),
-            passwordTextField.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            passwordTextField.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            passwordTextField.topAnchor.constraint(equalTo: passwordLabel.bottomAnchor, constant: 8),
-            passwordTextField.heightAnchor.constraint(equalToConstant: 56),
-            forgotPasswordButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            forgotPasswordButton.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 12),
-            forgotPasswordButton.heightAnchor.constraint(equalToConstant: 44),
-            loginButton.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 32),
-            loginButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            loginButton.topAnchor.constraint(equalTo: forgotPasswordButton.bottomAnchor, constant: 32),
-            loginButton.heightAnchor.constraint(equalToConstant: 56),
-            loginButton.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -24),
-            signUpLinkButton.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -32),
-            signUpLinkButton.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 20),
-            signUpLinkButton.heightAnchor.constraint(equalToConstant: 44)
+            signUpLinkButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            signUpLinkButton.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 4),
+            signUpLinkButton.heightAnchor.constraint(equalToConstant: 44),
+            
+            logoImageView.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            logoImageView.widthAnchor.constraint(equalTo: contentView.widthAnchor, multiplier: 0.55),
+            logoImageView.topAnchor.constraint(equalTo: signUpLinkButton.bottomAnchor, constant: 12),
+            titleLabel.topAnchor.constraint(equalTo: logoImageView.bottomAnchor, constant: 14),
+            titleLabel.centerXAnchor.constraint(equalTo: contentView.centerXAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            titleLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            usernameLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            usernameLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            usernameLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+            usernameTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            usernameTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            usernameTextField.topAnchor.constraint(equalTo: usernameLabel.bottomAnchor, constant: 6),
+            usernameTextField.heightAnchor.constraint(equalToConstant: 52),
+            passwordLabel.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            passwordLabel.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            passwordLabel.topAnchor.constraint(equalTo: usernameTextField.bottomAnchor, constant: 14),
+            passwordTextField.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            passwordTextField.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            passwordTextField.topAnchor.constraint(equalTo: passwordLabel.bottomAnchor, constant: 6),
+            passwordTextField.heightAnchor.constraint(equalToConstant: 52),
+            loginButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: side),
+            loginButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -side),
+            loginButton.topAnchor.constraint(equalTo: passwordTextField.bottomAnchor, constant: 24),
+            loginButton.heightAnchor.constraint(equalToConstant: 52),
+            loginButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -28)
         ])
         
-        // Text field observers
-        usernameTextField.addTarget(self, action: #selector(textFieldDidBeginEditing(_:)), for: .editingDidBegin)
-        usernameTextField.addTarget(self, action: #selector(textFieldDidEndEditing(_:)), for: .editingDidEnd)
-        passwordTextField.addTarget(self, action: #selector(textFieldDidBeginEditing(_:)), for: .editingDidBegin)
-        passwordTextField.addTarget(self, action: #selector(textFieldDidEndEditing(_:)), for: .editingDidEnd)
+        // Focus + return behavior is handled via UITextFieldDelegate
     }
     
     private func setupStyling() {
@@ -269,12 +297,7 @@ class LoginViewController: UIViewController {
             field.attributedPlaceholder = NSAttributedString(string: placeholderText, attributes: [.foregroundColor: UIColor.white.withAlphaComponent(0.85)])
         }
         
-        // Forgot Password Button - white for visibility over video
-        forgotPasswordButton.setTitleColor(.white, for: .normal)
-        forgotPasswordButton.titleLabel?.font = UIFont.systemFont(ofSize: 15, weight: .medium)
-        
-        // Login button - gradient
-        loginButton.applyGradientStyle()
+        loginButton.applySolidPrimaryCTAStyle()
         
         // Sign Up Link - white for visibility over video
         signUpLinkButton.setTitleColor(.white, for: .normal)
@@ -287,12 +310,38 @@ class LoginViewController: UIViewController {
         passwordLabel.textColor = .white
     }
     
-    @objc private func textFieldDidBeginEditing(_ textField: UITextField) {
+    func textFieldDidBeginEditing(_ textField: UITextField) {
+        activeTextField = textField
         textField.updateFocusState(true)
+        DispatchQueue.main.async { [weak self] in
+            self?.scrollFieldIntoView(textField)
+        }
     }
     
-    @objc private func textFieldDidEndEditing(_ textField: UITextField) {
+    func textFieldDidEndEditing(_ textField: UITextField) {
         textField.updateFocusState(false)
+    }
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        if textField === usernameTextField {
+            passwordTextField.becomeFirstResponder()
+            return true
+        }
+        if textField === passwordTextField {
+            textField.resignFirstResponder()
+            return true
+        }
+        textField.resignFirstResponder()
+        return true
+    }
+    
+    @objc private func backgroundTapped() {
+        view.endEditing(true)
+    }
+    
+    private func scrollFieldIntoView(_ textField: UITextField) {
+        let rectInScroll = textField.convert(textField.bounds, to: scrollView)
+        scrollView.scrollRectToVisible(rectInScroll.insetBy(dx: 0, dy: -24), animated: true)
     }
     
     @objc private func loginTapped() {

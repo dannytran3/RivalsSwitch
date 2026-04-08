@@ -10,11 +10,28 @@ import UIKit
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
-
-
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Override point for customization after application launch.
         return true
+    }
+
+    /// Honors each screen’s `supportedInterfaceOrientations` (e.g. portrait-only auth) instead of relying on container defaults.
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        guard let root = window?.rootViewController else { return .portrait }
+        return Self.supportedOrientationsRecursively(from: root)
+    }
+
+    private static func supportedOrientationsRecursively(from vc: UIViewController) -> UIInterfaceOrientationMask {
+        if let presented = vc.presentedViewController {
+            return supportedOrientationsRecursively(from: presented)
+        }
+        if let nav = vc as? UINavigationController, let top = nav.topViewController {
+            return supportedOrientationsRecursively(from: top)
+        }
+        if let tab = vc as? UITabBarController, let selected = tab.selectedViewController {
+            return supportedOrientationsRecursively(from: selected)
+        }
+        return vc.supportedInterfaceOrientations
     }
 
     // MARK: UISceneSession Lifecycle
