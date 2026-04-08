@@ -18,6 +18,16 @@ class ConfirmEnemyTeamViewController: UIViewController, UITextFieldDelegate, UIP
     private let enemy6TextField = UITextField()
     private let doneButton = UIButton(type: .custom)
     private let enemyPicker = UIPickerView()
+    /// Single wrapper avoids bare UIPickerView as `inputView` (reduces keyboard/picker constraint churn on some OS versions).
+    private lazy var enemyPickerInputView: UIView = {
+        let h: CGFloat = 216
+        let w = UIScreen.main.bounds.width
+        let v = UIView(frame: CGRect(x: 0, y: 0, width: w, height: h))
+        enemyPicker.frame = v.bounds
+        enemyPicker.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        v.addSubview(enemyPicker)
+        return v
+    }()
     private var gradientLayer: CAGradientLayer?
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -115,7 +125,7 @@ class ConfirmEnemyTeamViewController: UIViewController, UITextFieldDelegate, UIP
             textField.spellCheckingType = .no
             textField.clearButtonMode = .never
             textField.delegate = self
-            textField.inputView = enemyPicker
+            textField.inputView = enemyPickerInputView
             textField.inputAccessoryView = toolbar
         }
         

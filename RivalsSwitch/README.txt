@@ -1,40 +1,53 @@
+RivalsSwitch — CS 371L Spring 2026 — Beta Release
+Team Number: 4
+Team Members: Carlos Olvera, Danny Tran, Joseph Turcios, Steven Nguyen
+
 
 Contributions
 
-Carlos Olvera (20%)
-• Initial project setup and application framework
-• Core functionality connecting screens and navigation flow
-• Camera scan feature for capturing screenshots
-• Integration of image capture with the match analysis pipeline
+Carlos Olvera (Beta release 25%, Overall 25%)
+• Initial project setup and application framework (alpha)
+• Core navigation and wiring between screens (alpha)
+• Camera scan integration with the match and recommendation pipeline (alpha)
+• Recommendation engine: scoring logic, hero matchup analysis, and end-to-end integration with saved matches (beta)
+• Code cleanup, documentation-style comments, and consistency pass across controllers and styling helpers (beta)
 
-Danny Tran (25%)
-• User interface elements across multiple screens
-• App design and coloring for consistent visual style
-• App icon creation
-• Home screen improvements and quick navigation links
+Danny Tran (Beta release 25%, Overall 25%)
+• Programmatic UI foundation, shared colors/fonts/styling, and app icon and launch assets (alpha)
+• Home screen structure and navigation patterns (alpha)
+• OCR and scan pipeline improvements: camera scan flow, confirm-stats and confirm-enemy screens, and session/auth fixes including stale login handling (beta)
+• User preferences: UserDefaults-backed messaging tone and recommendation aggressiveness (AppPreferenceStore) wired into the app (beta)
+• Hero portrait matching (HeroPortraitMatcher), expanded hero registry and icon assets for recognition and UI (beta)
+• Broad UI polish across login, account creation, history, landing, and tab bar (beta)
 
-Joseph Turcios (30%)
-• Login and signup system for user accounts
-• Profile page and profile data storage
-• Match history system and saving match results
-• Settings page and storage of user preferences
+Joseph Turcios (Beta release 25%, Overall 25%)
+• Login and signup, profile storage, match history, and settings (alpha)
+• Home screen redesign and improved entry points into key flows (beta)
+• Profile and history enhancements, including messaging and presentation updates (beta)
+• Party feature: party creation UI, party member cards and SwiftUI party views, and local party state (beta; see Differences)
 
-Steven Nguyen (25%)
-• Recommendation system logic for suggesting hero switches
-• Hero matchup analysis and performance evaluation
-• Camera analysis logic for detecting hero and stat information from screenshots
+Steven Nguyen (Beta release 25%, Overall 25%)
+• Recommendation-oriented analysis and early camera-side logic (alpha)
+• OCR for scoreboard screenshots: hero detection and KDA-style stat lines from leaderboard regions (beta)
+• Scoreboard-oriented avatar assets and integration to support scan and confirmation (beta)
+• Enemy team selection UX: picker / dropdown-style selection on the confirm-enemy flow (beta)
+• Ongoing work on harder cases such as usernames and highlighted scoreboard text (beta; see Differences)
+
 
 Differences
 
-Screenshot detection added earlier than planned
-The original proposal planned for manual player input during the Alpha release, with screenshot detection listed as a stretch feature. During development, we were able to begin implementing screenshot detection earlier than expected. This allowed the app to automatically detect characters and player statistics from match screenshots. Users can still confirm or edit the detected data to ensure accuracy.
+OCR and computer vision accuracy
+The proposal assumed reliable extraction from screenshots. In practice, recognition depends on lighting, UI scale, and scoreboard layout. Hero and stat-line detection work in many cases, but accuracy is not perfect; we are still tuning thresholds, expanding reference imagery, and refining the portrait-matching path. Users can always correct detections on the confirmation screens.
 
-Expanded navigation and home screen
-The proposal mainly described the match analysis flow, but during development we added a home screen with quick links to important features such as history, profile, and settings. This change was made to improve usability and make navigation easier for users.
+Party feature scope
+The party tab lets users create a party and choose heroes for slots, but selections are primarily a local, visual representation and do not yet reflect live in-game picks or full multiplayer coordination. Completing real party sync and game-accurate roles remains stretch work beyond this beta.
 
-Additional customization options in settings
-The proposal included messaging tone and recommendation style settings. During development we expanded these slightly to allow users to control how aggressive the recommendation system should be when suggesting character switches. This helps support both casual and competitive players.
+Text and edge cases on scoreboards
+Some scoreboard elements (for example certain usernames or nonstandard text styling) are still being improved in the OCR pipeline, as noted during implementation.
 
-Improved UI earlier in development
-The Alpha plan originally described a minimal interface. However, some UI improvements such as color styling, icons, and improved layout were implemented earlier in development to make the application easier to use and demonstrate.
+Expanded preferences
+Beyond the tone and recommendation-style settings described in the proposal, we implemented concrete preference storage (messaging tone and recommendation aggressiveness) so recommendations and copy can respect user choices in one place.
+
+Navigation and polish earlier than a “minimal” beta
+We continued the alpha-era direction of a cohesive, programmatic UI (shared styling, tab layout including Party and Match) so the beta reads as one product rather than disconnected prototypes.
 

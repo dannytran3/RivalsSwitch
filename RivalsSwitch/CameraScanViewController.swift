@@ -424,58 +424,99 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     private func handleRecognizedText(_ observations: [VNRecognizedTextObservation], in image: UIImage) {
         detectedHeroesLabel.text = "Scan Complete"
         
-        print("OBSERVATION COUNT:", observations.count)
+        let splitX = scoreboardColumnSplitX(from: observations)
+        let (rowMinMidY, rowMaxMidY) = scoreboardRowMidYRange(from: observations)
         
-        let leftRows = buildRows(from: filteredYourTeamObservations(from: observations), in: image)
-        
-        print("OCR ROWS (your team):")
-        for row in leftRows {
-            print(row.texts, "yellow:", row.yellowScore, "frame:", row.frame)
-        }
+        let leftRows = buildRows(
+            from: filteredYourTeamObservations(from: observations),
+            in: image,
+            splitX: splitX,
+            minMidY: rowMinMidY,
+            maxMidY: rowMaxMidY
+        )
         
         // Clear any previous in-progress match data before saving new OCR results
         MatchStore.shared.clearCurrentMatch()
         
         if let bottomHero = parseBottomBarPlayingHero(from: observations), !bottomHero.isEmpty {
             MatchStore.shared.currentHero = bottomHero
-            print("PLAYING HERO (bottom stats bar):", bottomHero)
         } else {
             parseHero(from: observations)
-            print("PLAYING HERO (fallback, lower-left OCR):", MatchStore.shared.currentHero)
         }
         
         if let statsRow = findMyStatsRow(from: leftRows, playingHero: MatchStore.shared.currentHero) {
-            print("K/D/A ROW:", statsRow.texts, "yellow:", statsRow.yellowScore)
             parseSelectedPlayerData(from: statsRow, using: observations)
-        } else {
-            print("NO K/D/A ROW FOUND")
         }
         
-        parseEnemyTeam(from: observations, in: image)
-        parseFriendlyTeam(from: filteredYourTeamObservations(from: observations), in: image)
+        parseEnemyTeam(
+            from: observations,
+            in: image,
+            splitX: splitX,
+            minMidY: rowMinMidY,
+            maxMidY: rowMaxMidY
+        )
+        parseFriendlyTeam(
+            from: filteredYourTeamObservations(from: observations),
+            in: image,
+            splitX: splitX,
+            minMidY: rowMinMidY,
+            maxMidY: rowMaxMidY
+        )
+
+        // Enemy hero identity comes from portrait matching only (rows show usernames, not hero names).
+        // Anchor portrait crops to YOUR TEAM row midYs — enemy rows are at the same Y positions.
+        let friendlyRowMidYs = leftRows.prefix(6).map { $0.midY }
 
         DispatchQueue.global(qos: .userInitiated).async {
-            HeroPortraitMatcher.shared.refineEnemyTeamWithPortraits(in: image) {
-                HeroPortraitMatcher.shared.debugRunCalibrationOnBundledSamples()
-
-                print("SAVED HERO:", MatchStore.shared.currentHero)
-                print("SAVED USERNAME:", MatchStore.shared.currentUsername)
-                print("SAVED KDA:", MatchStore.shared.currentKills, MatchStore.shared.currentDeaths, MatchStore.shared.currentAssists)
-                
+            HeroPortraitMatcher.shared.refineEnemyTeamWithPortraits(
+                in: image,
+                friendlyRowMidYs: Array(friendlyRowMidYs),
+                splitX: splitX
+            ) {
                 let confirmStatsVC = ConfirmMyStatsViewController()
                 self.navigationController?.pushViewController(confirmStatsVC, animated: true)
             }
         }
     }
 
-    /// Left team column (your team) — same x-filter as before: `minX <= 0.56`.
-    private func buildRows(from observations: [VNRecognizedTextObservation], in image: UIImage) -> [OCRRow] {
-        buildSideRows(from: observations, in: image, includeMinX: { $0 <= 0.56 }, minMidY: 0.34, maxMidY: 0.86)
+    /// Left team column — `splitX` comes from OCR layout (gap between columns), not a fixed fraction.
+    private func buildRows(from observations: [VNRecognizedTextObservation], in image: UIImage, splitX: CGFloat, minMidY: CGFloat, maxMidY: CGFloat) -> [OCRRow] {
+        let margin: CGFloat = 0.008
+        return buildSideRows(from: observations, in: image, includeMinX: { $0 <= splitX - margin }, minMidY: minMidY, maxMidY: maxMidY)
     }
     
-    /// Right team column (enemy). Allows the same hero name as your character; order follows scoreboard rows top → bottom.
-    private func buildEnemyRows(from observations: [VNRecognizedTextObservation], in image: UIImage) -> [OCRRow] {
-        buildSideRows(from: observations, in: image, includeMinX: { $0 >= 0.56 }, minMidY: 0.34, maxMidY: 0.86)
+    /// Enemy column — right of `splitX`.
+    private func buildEnemyRows(from observations: [VNRecognizedTextObservation], in image: UIImage, splitX: CGFloat, minMidY: CGFloat, maxMidY: CGFloat) -> [OCRRow] {
+        let margin: CGFloat = 0.008
+        return buildSideRows(from: observations, in: image, includeMinX: { $0 >= splitX + margin }, minMidY: minMidY, maxMidY: maxMidY)
+    }
+    
+    /// Estimate vertical band where scoreboard **rows** live from headers; wide fallback for cropped / odd aspect images.
+    private func scoreboardRowMidYRange(from observations: [VNRecognizedTextObservation]) -> (CGFloat, CGFloat) {
+        let fallbackMin: CGFloat = 0.08
+        let fallbackMax: CGFloat = 0.96
+        var maxMidY = fallbackMax
+        if let e = enemyTeamHeaderMinY(from: observations) { maxMidY = min(maxMidY, e - 0.015) }
+        if let y = yourTeamHeaderMinY(from: observations) { maxMidY = min(maxMidY, y - 0.015) }
+        let minMidY: CGFloat = 0.10
+        guard maxMidY > minMidY + 0.06 else { return (fallbackMin, fallbackMax) }
+        return (minMidY, maxMidY)
+    }
+    
+    /// Horizontal split between “your team” and “enemy” columns from OCR clusters (works when the scoreboard is cropped or full-screen).
+    private func scoreboardColumnSplitX(from observations: [VNRecognizedTextObservation]) -> CGFloat {
+        var leftMaxX: CGFloat = 0
+        var rightMinX: CGFloat = 1
+        for obs in observations {
+            let r = obs.boundingBox
+            let m = r.midX
+            if m < 0.46 { leftMaxX = max(leftMaxX, r.maxX) }
+            if m > 0.54 { rightMinX = min(rightMinX, r.minX) }
+        }
+        if leftMaxX > 0.18, rightMinX < 0.92, rightMinX > leftMaxX + 0.03 {
+            return (leftMaxX + rightMinX) / 2
+        }
+        return 0.52
     }
 
     /// If the OCR sees the "ENEMY TEAM" header, use its bottom edge as the top bound for enemy rows.
@@ -560,7 +601,7 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         }
         
         let sorted = items.sorted {
-            if abs($0.midY - $1.midY) > 0.03 {
+            if abs($0.midY - $1.midY) > 0.042 {
                 return $0.midY > $1.midY
             }
             return $0.minX < $1.minX
@@ -568,11 +609,12 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         
         var groupedRows: [[OCRItem]] = []
         
+        let rowYMerge: CGFloat = 0.042
         for item in sorted {
             if let lastIndex = groupedRows.indices.last {
                 let lastRowY = groupedRows[lastIndex].map(\.midY).reduce(0, +) / CGFloat(groupedRows[lastIndex].count)
                 
-                if abs(lastRowY - item.midY) < 0.03 {
+                if abs(lastRowY - item.midY) < rowYMerge {
                     groupedRows[lastIndex].append(item)
                 } else {
                     groupedRows.append([item])
@@ -602,12 +644,23 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
     
     /// First hero name found in row text, left → right; empty if none (leave slot blank).
     private func heroNameForScoreboardRow(_ row: OCRRow) -> String {
+        bestHeroNameFromScoreboardRow(row)
+    }
+    
+    /// OCR order varies (username/KDA before hero). Consider every token plus the whole row; prefer longest matching hero name.
+    private func bestHeroNameFromScoreboardRow(_ row: OCRRow) -> String {
+        var candidates: [String] = []
         for text in row.texts {
             if let name = bestMatchingHeroName(from: text) {
-                return name
+                candidates.append(name)
             }
         }
-        return ""
+        if candidates.isEmpty {
+            let joined = row.texts.joined(separator: " ")
+            return bestMatchingHeroName(from: joined) ?? ""
+        }
+        let unique = Array(Set(candidates))
+        return unique.max(by: { $0.count < $1.count }) ?? candidates[0]
     }
     
     /// Post-match bar at the bottom names your hero explicitly (e.g. "ANGELA"); Vision `midY` is low there.
@@ -681,7 +734,6 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             .min { $0.1 < $1.1 }
 
             if let bestMatch = bestUsernameMatch, bestMatch.1 <= 4 {
-                print("SELECTED ROW BY CLOSEST USERNAME:", bestMatch.0.texts, "distance:", bestMatch.1)
                 return bestMatch.0
             }
         }
@@ -699,19 +751,10 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
             return true
         }
 
-        print("CANDIDATE ROWS:")
-        for row in candidateRows {
-            print(row.texts, "yellow:", row.yellowScore)
-        }
-        
         return candidateRows.max { $0.yellowScore < $1.yellowScore }
     }
     
     private func parseSelectedPlayerData(from selectedRow: OCRRow, using observations: [VNRecognizedTextObservation]) {
-        // Save the full row text for debugging
-        print("SELECTED ROW FRAME:", selectedRow.frame)
-        print("SELECTED ROW YELLOW:", selectedRow.yellowScore)
-        
         let rowJoined = selectedRow.texts.joined(separator: " ")
         let rowKDA = extractLastKDATripleFromRowText(rowJoined)
         
@@ -750,20 +793,11 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         let deathTexts = texts(in: deathsBox, from: observations)
         let assistTexts = texts(in: assistsBox, from: observations)
         
-        print("USERNAME BOX:", usernameTexts)
-        print("KILLS BOX:", killTexts)
-        print("DEATHS BOX:", deathTexts)
-        print("ASSISTS BOX:", assistTexts)
-        
         // Save the best OCR results into the shared match store
         let username = bestUsername(from: usernameTexts)
         let kills = rowKDA?.0 ?? firstInteger(in: killTexts.joined(separator: " "))
         let deaths = rowKDA?.1 ?? firstInteger(in: deathTexts.joined(separator: " "))
         let assists = rowKDA?.2 ?? firstInteger(in: assistTexts.joined(separator: " "))
-        
-        if let s = rowKDA {
-            print("K/D/A (triple from row text):", s.0, s.1, s.2)
-        }
         
         MatchStore.shared.currentUsername = username ?? ""
         MatchStore.shared.currentKills = kills ?? 0
@@ -801,27 +835,35 @@ class CameraScanViewController: UIViewController, UIImagePickerControllerDelegat
         return (k, d, a)
     }
     
-    private func parseEnemyTeam(from observations: [VNRecognizedTextObservation], in image: UIImage) {
+    /// Returns up to six enemy **row frames** (Vision normalized) for portrait matching — empty rects are ignored by the matcher.
+    @discardableResult
+    private func parseEnemyTeam(from observations: [VNRecognizedTextObservation], in image: UIImage, splitX: CGFloat, minMidY: CGFloat, maxMidY: CGFloat) -> [CGRect] {
+        // Prefer text strictly *below* the ENEMY TEAM title (midY below header bottom). Fallback if that strips too much OCR.
         let filtered: [VNRecognizedTextObservation]
-        if let headerMinY = enemyTeamHeaderMinY(from: observations) {
-            filtered = observations.filter { $0.boundingBox.maxY < headerMinY }
+        if let headerBottom = enemyTeamHeaderMinY(from: observations) {
+            let cut = headerBottom - 0.012
+            let belowHeader = observations.filter { $0.boundingBox.midY < cut }
+            filtered = belowHeader.count >= 12 ? belowHeader : observations
         } else {
             filtered = observations
         }
-        let rows = buildEnemyRows(from: filtered, in: image)
-        let fromRows = rows.prefix(6).map { heroNameForScoreboardRow($0) }
+        var rows = buildEnemyRows(from: filtered, in: image, splitX: splitX, minMidY: minMidY, maxMidY: maxMidY)
+        if rows.count < 4 {
+            rows = buildEnemyRows(from: observations, in: image, splitX: splitX, minMidY: minMidY, maxMidY: maxMidY)
+        }
+        let fromRows = rows.prefix(6).map { bestHeroNameFromScoreboardRow($0) }
+        let frames = Array(rows.prefix(6).map(\.frame))
         let padded = Array(fromRows) + Array(repeating: "", count: max(0, 6 - fromRows.count))
         let deduped = MatchStore.dedupeEnemyHeroSlotsPreservingOrder(padded)
         saveEnemyTeam(deduped)
-        print("DETECTED ENEMY TEAM (row order, duplicates cleared):", deduped)
+        return frames
     }
     
-    private func parseFriendlyTeam(from observations: [VNRecognizedTextObservation], in image: UIImage) {
-        let rows = buildRows(from: observations, in: image)
+    private func parseFriendlyTeam(from observations: [VNRecognizedTextObservation], in image: UIImage, splitX: CGFloat, minMidY: CGFloat, maxMidY: CGFloat) {
+        let rows = buildRows(from: observations, in: image, splitX: splitX, minMidY: minMidY, maxMidY: maxMidY)
         let fromRows = rows.prefix(6).map { heroNameForScoreboardRow($0) }
         let padded = Array(fromRows) + Array(repeating: "", count: max(0, 6 - fromRows.count))
         saveFriendlyTeam(padded)
-        print("DETECTED FRIENDLY TEAM (row order, duplicates allowed):", padded)
     }
     
     private func texts(in region: CGRect, from observations: [VNRecognizedTextObservation]) -> [String] {

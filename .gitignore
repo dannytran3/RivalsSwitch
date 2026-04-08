@@ -6,5 +6,11 @@ xcuserdata/
 build/
 DerivedData/
 
+# Local venv for tools/export_portrait_crops.py
+.venv-crops/
+
 # macOS
 .DS_Store
+
+# Pulled Simulator portrait debug JPEGs (see pull-portrait-debug.sh)
+_PortraitDebugCrops_pull/
