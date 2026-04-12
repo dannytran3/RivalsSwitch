@@ -25,6 +25,7 @@ class RecommendationsViewController: UIViewController {
     private let switch3ReasonLabel = UILabel()
     private let saveMatchButton = UIButton(type: .custom)
     private let backButton = UIButton(type: .custom)
+    private let potentialTeamUpButton = UIButton(type: .custom)
     private var gradientLayer: CAGradientLayer?
     private let scrollView = UIScrollView()
     private let contentView = UIView()
@@ -143,6 +144,11 @@ class RecommendationsViewController: UIViewController {
         backButton.addTarget(self, action: #selector(backTapped), for: .touchUpInside)
         contentView.addSubview(backButton)
         
+        potentialTeamUpButton.translatesAutoresizingMaskIntoConstraints = false
+        potentialTeamUpButton.setTitle("Potential Team-Up", for: .normal)
+        potentialTeamUpButton.addTarget(self, action: #selector(potentialTeamUpTapped), for: .touchUpInside)
+        contentView.addSubview(potentialTeamUpButton)
+        
         let side: CGFloat = 20
         let topPad: CGFloat = 16
         
@@ -216,16 +222,23 @@ class RecommendationsViewController: UIViewController {
             switch3ReasonLabel.trailingAnchor.constraint(equalTo: switch3Card.trailingAnchor, constant: -side),
             switch3ReasonLabel.bottomAnchor.constraint(equalTo: switch3Card.bottomAnchor, constant: -topPad),
             
+            potentialTeamUpButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
+            potentialTeamUpButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
+            potentialTeamUpButton.topAnchor.constraint(equalTo: switch3Card.bottomAnchor, constant: 32),
+            potentialTeamUpButton.heightAnchor.constraint(equalToConstant: 56),
+
             saveMatchButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
             saveMatchButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
-            saveMatchButton.topAnchor.constraint(equalTo: switch3Card.bottomAnchor, constant: 32),
+            saveMatchButton.topAnchor.constraint(equalTo: potentialTeamUpButton.bottomAnchor, constant: 16),
             saveMatchButton.heightAnchor.constraint(equalToConstant: 56),
-            
+
             backButton.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 32),
             backButton.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -32),
             backButton.topAnchor.constraint(equalTo: saveMatchButton.bottomAnchor, constant: 16),
             backButton.heightAnchor.constraint(equalToConstant: 56),
             backButton.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -40)
+
+            
         ])
     }
     
@@ -259,6 +272,7 @@ class RecommendationsViewController: UIViewController {
         
         saveMatchButton.applySolidPrimaryCTAStyle()
         backButton.applySecondaryStyle()
+        potentialTeamUpButton.applySecondaryStyle()
     }
     
     private func heroDisplayName(for label: UILabel) -> String {
@@ -308,5 +322,10 @@ class RecommendationsViewController: UIViewController {
 
     @objc private func backTapped() {
         navigationController?.popToRootViewController(animated: true)
+    }
+    
+    @objc private func potentialTeamUpTapped() {
+        let vc = PotentialTeamUpViewController()
+        navigationController?.pushViewController(vc, animated: true)
     }
 }

@@ -28,7 +28,7 @@
             <objects>
                 <viewController title="Match Overview" id="FcP-4v-sov" customClass="MatchOverviewViewController" customModule="RivalsSwitch" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="oxz-XS-Rlv">
-                        <rect key="frame" x="0.0" y="0.0" width="440" height="894"/>
+                        <rect key="frame" x="0.0" y="0.0" width="440" height="884"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <button opaque="NO" contentMode="scaleToFill" fixedFrame="YES" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="6Q8-KZ-a2i">
@@ -442,7 +442,7 @@
             <objects>
                 <viewController title="History" id="J7U-4k-W8a" customClass="HistoryViewController" customModule="RivalsSwitch" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="vtN-0w-RSA">
-                        <rect key="frame" x="0.0" y="0.0" width="440" height="894"/>
+                        <rect key="frame" x="0.0" y="0.0" width="440" height="884"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="Match History" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="coT-vy-jNa">
@@ -702,7 +702,7 @@
             <objects>
                 <viewController title="Recommendations" id="sYw-O5-oRI" customClass="RecommendationsViewController" customModule="RivalsSwitch" customModuleProvider="target" sceneMemberID="viewController">
                     <view key="view" contentMode="scaleToFill" id="UTO-zW-zkd">
-                        <rect key="frame" x="0.0" y="0.0" width="440" height="884"/>
+                        <rect key="frame" x="0.0" y="0.0" width="440" height="894"/>
                         <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
                         <subviews>
                             <label opaque="NO" userInteractionEnabled="NO" contentMode="left" horizontalHuggingPriority="251" verticalHuggingPriority="251" fixedFrame="YES" text="Suggested Switches" textAlignment="natural" lineBreakMode="tailTruncation" baselineAdjustment="alignBaselines" adjustsFontSizeToFit="NO" translatesAutoresizingMaskIntoConstraints="NO" id="lbw-3g-DbT">
@@ -813,6 +813,40 @@
             </objects>
             <point key="canvasLocation" x="5040.4580152671751" y="781.69014084507046"/>
         </scene>
+        <!--Potential Team Up View Controller-->
+        <scene sceneID="yVm-RQ-e4N">
+            <objects>
+                <viewController storyboardIdentifier="PotentialTeamUpViewController" id="7SG-yY-VkG" customClass="PotentialTeamUpViewController" customModule="RivalsSwitch" customModuleProvider="target" sceneMemberID="viewController">
+                    <view key="view" contentMode="scaleToFill" id="vYj-3T-Mko">
+                        <rect key="frame" x="0.0" y="0.0" width="440" height="956"/>
+                        <autoresizingMask key="autoresizingMask" widthSizable="YES" heightSizable="YES"/>
+                        <subviews>
+                            <button opaque="NO" contentMode="scaleToFill" contentHorizontalAlignment="center" contentVerticalAlignment="center" buttonType="system" lineBreakMode="middleTruncation" translatesAutoresizingMaskIntoConstraints="NO" id="p9c-6e-CPO">
+                                <rect key="frame" x="190" y="831" width="62" height="35"/>
+                                <state key="normal" title="Button"/>
+                                <buttonConfiguration key="configuration" style="plain" title="Back"/>
+                                <connections>
+                                    <segue destination="sYw-O5-oRI" kind="show" id="1DM-xk-ePA"/>
+                                </connections>
+                            </button>
+                        </subviews>
+                        <viewLayoutGuide key="safeArea" id="7yy-X7-Vx4"/>
+                        <color key="backgroundColor" systemColor="systemBackgroundColor"/>
+                        <constraints>
+                            <constraint firstItem="p9c-6e-CPO" firstAttribute="leading" secondItem="7yy-X7-Vx4" secondAttribute="leading" constant="190" id="7Du-1r-Gez"/>
+                            <constraint firstItem="7yy-X7-Vx4" firstAttribute="bottom" secondItem="p9c-6e-CPO" secondAttribute="bottom" constant="22" id="Bk2-5H-mCd"/>
+                            <constraint firstItem="7yy-X7-Vx4" firstAttribute="trailing" secondItem="p9c-6e-CPO" secondAttribute="trailing" constant="188" id="uyb-oZ-EUY"/>
+                        </constraints>
+                    </view>
+                    <navigationItem key="navigationItem" id="ayR-sD-RUG"/>
+                    <connections>
+                        <outlet property="backButton" destination="p9c-6e-CPO" id="0Gq-cD-TWh"/>
+                    </connections>
+                </viewController>
+                <placeholder placeholderIdentifier="IBFirstResponder" id="rct-5x-YqY" userLabel="First Responder" customClass="UIResponder" sceneMemberID="firstResponder"/>
+            </objects>
+            <point key="canvasLocation" x="6090" y="768"/>
+        </scene>
         <!--Item 1-->
         <scene sceneID="k3Q-Wd-gTs">
             <objects>
@@ -852,6 +886,7 @@
         </scene>
     </scenes>
     <inferredMetricsTieBreakers>
+        <segue reference="1DM-xk-ePA"/>
         <segue reference="CEa-jF-NCy"/>
         <segue reference="DtM-91-pSe"/>
         <segue reference="ics-AU-6Cc"/>
