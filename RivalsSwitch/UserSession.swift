@@ -23,7 +23,11 @@ class UserSession {
             Auth.auth().currentUser?.displayName ?? UserDefaults.standard.string(forKey: usernameKey)
         }
         set {
-            UserDefaults.standard.set(newValue, forKey: usernameKey)
+            let trimmedUsername = newValue?.trimmingCharacters(in: .whitespacesAndNewlines)
+            UserDefaults.standard.set(trimmedUsername, forKey: usernameKey)
+
+            guard let trimmedUsername, !trimmedUsername.isEmpty, isLoggedIn else { return }
+            FirestoreService.shared.updateUsername(trimmedUsername)
         }
     }
 
@@ -37,13 +41,13 @@ class UserSession {
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let email = email(for: trimmedUsername)
 
-        Auth.auth().createUser(withEmail: email, password: password) { [weak self] authResult, error in
+        Auth.auth().createUser(withEmail: email, password: password) { authResult, error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
 
-            self?.username = trimmedUsername
+            UserDefaults.standard.set(trimmedUsername, forKey: self.usernameKey)
 
             // Save the username as the Firebase display name too.
             let changeRequest = authResult?.user.createProfileChangeRequest()
@@ -54,7 +58,16 @@ class UserSession {
                     return
                 }
 
-                completion(.success(()))
+                FirestoreService.shared.createUserDocument(username: trimmedUsername) { firestoreError in
+                    if let firestoreError = firestoreError {
+                        completion(.failure(firestoreError))
+                        return
+                    }
+
+                    MatchStore.shared.replaceSavedMatches([])
+                    FirestoreService.shared.saveCurrentPreferences()
+                    completion(.success(()))
+                }
             }
         }
     }
@@ -63,19 +76,30 @@ class UserSession {
         let trimmedUsername = username.trimmingCharacters(in: .whitespacesAndNewlines)
         let email = email(for: trimmedUsername)
 
-        Auth.auth().signIn(withEmail: email, password: password) { [weak self] _, error in
+        Auth.auth().signIn(withEmail: email, password: password) { _, error in
             if let error = error {
                 completion(.failure(error))
                 return
             }
 
             // Cache the username for easy access in the UI.
-            self?.username = trimmedUsername
-            completion(.success(()))
+            UserDefaults.standard.set(trimmedUsername, forKey: self.usernameKey)
+
+            FirestoreService.shared.bootstrapCurrentUserData {
+                completion(.success(()))
+            }
         }
+    }
+
+    func refreshSessionData() {
+        guard isLoggedIn else { return }
+        FirestoreService.shared.bootstrapCurrentUserData()
     }
 
     func logout() {
         try? Auth.auth().signOut()
+        UserDefaults.standard.removeObject(forKey: usernameKey)
+        MatchStore.shared.replaceSavedMatches([])
+        MatchStore.shared.clearCurrentMatch()
     }
 }

@@ -14,6 +14,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Initialize Firebase once when the app launches.
         FirebaseApp.configure()
+
+        // Keep Firestore user settings in sync with local settings changes.
+        FirestoreService.shared.startPreferenceSyncObserver()
+
+        // If Firebase kept the user signed in, pull their profile/settings/history now.
+        UserSession.shared.refreshSessionData()
+
         return true
     }
 
