@@ -40,13 +40,6 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         super.viewDidLoad()
         setupUI()
         setupStyling()
-        
-        // Safety fallback in case this view is shown without navigation
-        if navigationController == nil {
-            let nav = UINavigationController(rootViewController: self)
-            nav.modalPresentationStyle = .fullScreen
-            self.view.window?.rootViewController?.present(nav, animated: false)
-        }
     }
 
     // Keep auth screens stable; allow rotation elsewhere.
@@ -71,7 +64,6 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
             let size = max(view.bounds.width, view.bounds.height) * 0.7
             glow2.frame = CGRect(x: -size * 0.35, y: view.bounds.maxY - size * 0.7, width: size, height: size)
         }
-        
     }
     
     private func setupUI() {
@@ -225,19 +217,20 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         passwordTextField.translatesAutoresizingMaskIntoConstraints = false
         passwordTextField.placeholder = "Enter your password"
         passwordTextField.isSecureTextEntry = true
+        passwordTextField.textContentType = .oneTimeCode
         passwordTextField.returnKeyType = .done
         passwordTextField.delegate = self
         contentView.addSubview(passwordTextField)
         
         // Login Button
         loginButton.translatesAutoresizingMaskIntoConstraints = false
-        loginButton.setTitle("Login", for: .normal)
+        loginButton.setTitle("Sign in", for: .normal)
         loginButton.addTarget(self, action: #selector(loginTapped), for: .touchUpInside)
         contentView.addSubview(loginButton)
         
         // Sign Up Link
         signUpLinkButton.translatesAutoresizingMaskIntoConstraints = false
-        signUpLinkButton.setTitle("Sign up", for: .normal)
+        signUpLinkButton.setTitle("Create account", for: .normal)
         signUpLinkButton.contentHorizontalAlignment = .right
         signUpLinkButton.addTarget(self, action: #selector(signUpTapped), for: .touchUpInside)
         contentView.addSubview(signUpLinkButton)
@@ -291,6 +284,7 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         usernameTextField.applyGlassmorphismStyle()
         passwordTextField.applyGlassmorphismStyle()
         passwordTextField.enablePasswordToggle()
+        
         // Lighter placeholders for visibility over video
         [usernameTextField, passwordTextField].forEach { field in
             guard let placeholderText = field.placeholder else { return }
@@ -345,21 +339,23 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
     }
     
     @objc private func loginTapped() {
-        guard let username = usernameTextField.text, !username.isEmpty,
-              let password = passwordTextField.text, !password.isEmpty else {
-            showAlert(title: "Missing Info", message: "Please enter both username and password.")
-            return
-        }
+        let username = usernameTextField.text ?? ""
+        let password = passwordTextField.text ?? ""
 
-        if UserSession.shared.login(username: username, password: password) {
-            // Navigate to app programmatically
-            if let windowScene = view.window?.windowScene,
-               let window = windowScene.windows.first {
-                window.rootViewController = MainTabBarController()
-                UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+        UserSession.shared.login(username: username, password: password) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    // Navigate to app programmatically
+                    if let windowScene = self?.view.window?.windowScene,
+                       let window = windowScene.windows.first {
+                        window.rootViewController = MainTabBarController()
+                        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+                    }
+                case .failure(let error):
+                    self?.showAlert(title: "Login Failed", message: error.localizedDescription)
+                }
             }
-        } else {
-            showAlert(title: "Login Failed", message: "Invalid username or password.")
         }
     }
     
@@ -374,4 +370,3 @@ class LoginViewController: UIViewController, UITextFieldDelegate {
         present(alert, animated: true)
     }
 }
-

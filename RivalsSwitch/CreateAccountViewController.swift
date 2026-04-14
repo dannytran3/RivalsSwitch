@@ -48,13 +48,11 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
     override var shouldAutorotate: Bool { false }
     override var preferredInterfaceOrientationForPresentation: UIInterfaceOrientation { .portrait }
     
-    
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
         
         // Keep layered backgrounds and button styling aligned with the view size
         gradientLayer?.frame = view.bounds
-        
         playerLayer?.frame = view.bounds
         scrimLayer?.frame = view.bounds
         
@@ -67,7 +65,6 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
             let size = max(view.bounds.width, view.bounds.height) * 0.7
             glow2.frame = CGRect(x: -size * 0.35, y: view.bounds.maxY - size * 0.7, width: size, height: size)
         }
-        
     }
     
     private func setupUI() {
@@ -112,13 +109,13 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
         view.layer.insertSublayer(gradient, at: 0)
         gradientLayer = gradient
         
-        // Animated background video (with bundle fallback)
+        // Background Video and Scrim
         let videoURL = Bundle.main.url(forResource: "animated-background", withExtension: "mp4") ?? URL(fileURLWithPath: "/Users/danny/RivalsSwitch/RivalsSwitch/animated-background.mp4")
         let player = AVPlayer(url: videoURL)
         player.isMuted = true
         player.actionAtItemEnd = .none
         videoPlayer = player
-
+        
         let vLayer = AVPlayerLayer(player: player)
         vLayer.videoGravity = .resizeAspectFill
         vLayer.frame = view.bounds
@@ -128,11 +125,9 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
             view.layer.insertSublayer(vLayer, at: 0)
         }
         playerLayer = vLayer
-
-        // Scrim for lower half
-        let scrim = CAGradientLayer()
         
-        // Dark overlay on lower half (match Landing) so content is readable
+        // Dark overlay on lower half so content is readable
+        let scrim = CAGradientLayer()
         scrim.colors = [
             UIColor.clear.cgColor,
             UIColor.appPrimaryBackground.withAlphaComponent(0.5).cgColor,
@@ -227,6 +222,7 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
         passwordTextField.translatesAutoresizingMaskIntoConstraints = false
         passwordTextField.placeholder = "Enter your password"
         passwordTextField.isSecureTextEntry = true
+        passwordTextField.textContentType = .oneTimeCode
         passwordTextField.returnKeyType = .next
         passwordTextField.delegate = self
         contentView.addSubview(passwordTextField)
@@ -235,6 +231,7 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
         confirmPasswordTextField.translatesAutoresizingMaskIntoConstraints = false
         confirmPasswordTextField.placeholder = "Confirm your password"
         confirmPasswordTextField.isSecureTextEntry = true
+        confirmPasswordTextField.textContentType = .oneTimeCode
         confirmPasswordTextField.returnKeyType = .done
         confirmPasswordTextField.delegate = self
         contentView.addSubview(confirmPasswordTextField)
@@ -371,29 +368,31 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
     }
     
     @objc private func createAccountTapped() {
-        
-        // Make sure every field was filled in
-        guard let username = usernameTextField.text, !username.isEmpty,
-              let password = passwordTextField.text, !password.isEmpty,
-              let confirmPassword = confirmPasswordTextField.text, !confirmPassword.isEmpty else {
-            showAlert(title: "Missing Info", message: "Please fill in all fields.")
-            return
-        }
+        let username = usernameTextField.text ?? ""
+        let password = passwordTextField.text ?? ""
+        let confirmPassword = confirmPasswordTextField.text ?? ""
         
         // Make sure both passwords match
-        guard password == confirmPassword else {
+        if password != confirmPassword {
             showAlert(title: "Password Mismatch", message: "Passwords do not match.")
             return
         }
 
         // Register the new account
-        UserSession.shared.register(username: username, password: password)
-        
-        // Navigate to app programmatically
-        if let windowScene = view.window?.windowScene,
-           let window = windowScene.windows.first {
-            window.rootViewController = MainTabBarController()
-            UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+        UserSession.shared.register(username: username, password: password) { [weak self] result in
+            DispatchQueue.main.async {
+                switch result {
+                case .success:
+                    // Navigate to app programmatically
+                    if let windowScene = self?.view.window?.windowScene,
+                       let window = windowScene.windows.first {
+                        window.rootViewController = MainTabBarController()
+                        UIView.transition(with: window, duration: 0.3, options: .transitionCrossDissolve, animations: nil)
+                    }
+                case .failure(let error):
+                    self?.showAlert(title: "Sign Up Failed", message: error.localizedDescription)
+                }
+            }
         }
     }
     
@@ -409,4 +408,3 @@ class CreateAccountViewController: UIViewController, UITextFieldDelegate {
         present(alert, animated: true)
     }
 }
-
