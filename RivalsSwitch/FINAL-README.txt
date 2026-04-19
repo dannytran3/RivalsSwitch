@@ -126,6 +126,6 @@ We also expanded beyond the original plan by adding a full user preferences syst
 This allows users to control messaging tone and recommendation aggressiveness, making the app feel more personalized.
 
 SUMMARY
-
 RivalsSwitch is a companion app for Marvel Rivals that helps players decide when and who to switch to during a match.
 By scanning the scoreboard, the app analyzes team compositions, player performance, and matchups to recommend better hero choices, explain why they work, and suggest teammates that pair well together
+
